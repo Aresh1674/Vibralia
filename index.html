@@ -331,6 +331,35 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
 .fam .rec{font-size:.7em;vertical-align:.15em}
 .repsheet{margin:10px 0 0}.repsheet .row{flex-wrap:wrap;gap:8px}.repsheet .row button{flex:1 1 auto}
 .fam .recb{color:#2fbf71}
+/* guide et vidéo */
+#tuto{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;padding:calc(18px + env(safe-area-inset-top,0px)) 20px calc(16px + env(safe-area-inset-bottom,0px));overflow-y:auto}
+#tuto[hidden]{display:none}
+#tuto .tk{font-size:var(--fs-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--accent);margin:8px 0 10px}
+#tuto h2{font-size:var(--fs-1);margin:0 0 14px;line-height:1.15}
+#tuto .tb{flex:1}
+#tuto .tb p{margin:0 0 12px}
+#tuto .tb ul{margin:0 0 12px;padding-left:20px}#tuto .tb li{margin:0 0 8px}
+#tuto .tb b{font-weight:600}
+#tuto .key{border-left:3px solid var(--accent);padding:8px 12px;background:var(--surface);border-radius:0 12px 12px 0}
+#tuto .dots{display:flex;gap:6px;justify-content:center;margin:14px 0 10px}#tuto .dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}#tuto .dots i.on{background:var(--accent)}
+#tuto .row button{flex:1}
+#tuto video,#page-help video{width:100%;max-height:62vh;border-radius:16px;background:#000;display:block}
+#prepTip{color:var(--warm)}
+/* liquide au toucher */
+.liq{position:relative;isolation:isolate;overflow:hidden}
+.vfx{position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;pointer-events:none;overflow:visible}
+.tile{position:relative;isolation:isolate;overflow:hidden;transition:border-color .3s,box-shadow .3s}
+.tile[aria-pressed="true"]{background:var(--surface)}
+.fam button.toggle{position:relative;isolation:isolate;overflow:hidden;transition:color .35s}
+.fam button.toggle[aria-pressed="true"]{background:transparent}
+.fam button.play{position:relative;isolation:isolate;overflow:hidden;min-width:40px}
+.fam button.play.on{color:var(--accent-ink)}
+.hold .fill{display:none}
+#prepCount.ring{width:140px;height:140px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:3rem;position:relative;isolation:isolate;overflow:hidden;color:var(--text);flex:none}
+.segctl{position:relative}
+.segctl .blob{position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;background:var(--accent);z-index:0;pointer-events:none}
+.segctl button{position:relative;z-index:1;transition:color .3s}
+.segctl.blobbed button[aria-pressed="true"]{background:transparent}
 .fam button.toggle[aria-pressed="true"] .recb{color:#0d5c32}
 </style>
 </head>
@@ -386,6 +415,8 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
     <div class="group-card"><button class="item" data-open="hr"><span class="it-t">Montre cardio</span><span class="sum" id="sumHr"></span></button><button class="item" data-open="track"><span class="it-t">Suivi du corps</span><span class="sum" id="sumTrack"></span></button></div>
     <p class="grp">Téléphone</p>
     <div class="group-card"><button class="item" data-open="tech"><span class="it-t">Lecture et écran</span><span class="sum" id="sumTech"></span></button></div>
+    <p class="grp">Aide</p>
+    <div class="group-card"><button class="item" data-open="help"><span class="it-t">Guide et vidéo</span><span class="sum">Comment utiliser Vibrostase</span></button></div>
     <p class="grp">Données</p>
     <div class="group-card"><button class="item" data-open="backup"><span class="it-t">Sauvegarde</span><span class="sum">Exporter, restaurer</span></button><button class="item" data-open="analysis"><span class="it-t">Données d'analyse</span><span class="sum" id="sumAna">Contribuer</span></button></div>
   </section>
@@ -597,6 +628,14 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
       
     </div>
   </section>
+  <section class="subpage" id="page-help" hidden>
+    <header class="pagehead"><button class="back" data-back="settings">‹ Réglages</button><h2>Guide et vidéo</h2></header>
+    <div class="pagebody">
+      <video id="helpVideo" controls playsinline preload="none" src="tuto.mp4"></video>
+      <p class="hint">2 min : de l'installation à l'export des données.</p>
+      <div class="row" style="margin-top:12px"><button id="btnGuide" class="primary">Guide pas à pas</button></div>
+    </div>
+  </section>
   <section class="subpage" id="page-analysis" hidden>
     <header class="pagehead"><button class="back" data-back="settings">‹ Réglages</button><h2>Données d'analyse</h2></header>
     <div class="pagebody">
@@ -708,12 +747,20 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
   <button data-tab="journal"><span class="ic" aria-hidden="true">☰</span>Journal</button>
   <button data-tab="settings"><span class="ic" aria-hidden="true">⚙</span>Réglages</button>
 </nav>
+<div id="tuto" hidden role="dialog" aria-modal="true" aria-labelledby="tutoTitle">
+  <div class="tk" id="tutoKicker"></div>
+  <h2 id="tutoTitle"></h2>
+  <div class="tb" id="tutoBody"></div>
+  <div class="dots" id="tutoDots"></div>
+  <div class="row" id="tutoRow"></div>
+</div>
 <div id="black" hidden><p>Touche l'écran pour rallumer</p></div>
 <div id="prep" hidden role="dialog" aria-live="polite" aria-labelledby="prepStep">
   <p class="prep-step" id="prepStep"></p>
-  <p class="prep-count" id="prepCount"></p>
+  <p class="prep-count" id="prepCount"><span id="prepNum"></span></p>
   <p class="prep-where" id="prepWhere"></p>
   <ul class="checks" id="prepChecks"></ul>
+  <p class="hint" id="prepTip" hidden></p>
   <p class="hint" id="prepWatch"></p>
   <div class="row prep-actions"><button id="prepGo" class="primary">Je suis installé</button><button id="prepSkip" hidden>Passer cette étape</button><button class="danger" id="prepCancel">Annuler</button></div>
 </div>
@@ -1958,10 +2005,15 @@ function drawTrack(g,w,h,d){
   }
   // courbe d'état : chaque segment prend la couleur du bloc joué à ce moment
   g.lineWidth=mini?1.6:2.6;g.lineJoin='round';g.lineCap='round';
+  // « corde pincée » : la courbe vibre autour d'un repère qu'on vient de poser
+  const P=d.pluck,off=P?(xx=>{const dx=(xx-P.x)/40;return P.A*Math.exp(-dx*dx)*Math.sin(xx*.55-P.s*38);}):null;
   let prev=null;
   for(const x of sm){
     if(x.st<0){prev=null;continue;}
-    if(prev){const c=blockColor(x.bk);g.strokeStyle=c;g.beginPath();g.moveTo(X(prev.t),Y(prev.st));g.lineTo(X(x.t),Y(prev.st));if(x.st!==prev.st)g.lineTo(X(x.t),Y(x.st));g.stroke();}
+    if(prev){const c=blockColor(x.bk);g.strokeStyle=c;g.beginPath();const x1=X(prev.t),x2=X(x.t),y1=Y(prev.st);
+      if(off&&x2>P.x-130&&x1<P.x+130){g.moveTo(x1,y1+off(x1));for(let xx=x1+3;xx<x2;xx+=3)g.lineTo(xx,y1+off(xx));g.lineTo(x2,y1+off(x2));if(x.st!==prev.st)g.lineTo(x2,Y(x.st)+off(x2));}
+      else{g.moveTo(x1,y1);g.lineTo(x2,y1);if(x.st!==prev.st)g.lineTo(x2,Y(x.st));}
+      g.stroke();}
     prev=x;
   }
   // repères : sursauts (haut), bruits (bas)
@@ -2305,10 +2357,66 @@ function currentPreset(){
   const u=Store.get('sequences',{})||{};for(const n of Object.keys(u))if(seqKey(u[n])===k)return {id:'user:'+n,label:n};
   return null;
 }
+
+/* ===== liquide au toucher : actif = le liquide monte, inactif = il s'écoule ===== */
+const Liquid=(()=>{
+  const NS='http://www.w3.org/2000/svg',E={out:t=>1-Math.pow(1-t,3),in:t=>t*t*t,lin:t=>t};
+  const map=new WeakMap();
+  class L{
+    constructor(el){this.el=el;this.o={};this.level=0;this.anim=null;this.raf=0;this.t0=performance.now();this.calm=0;}
+    mount(){
+      if(this.svg)return;const el=this.el;el.classList.add('liq');
+      const svg=document.createElementNS(NS,'svg');svg.setAttribute('class','vfx');svg.setAttribute('viewBox','0 0 100 100');svg.setAttribute('preserveAspectRatio','none');svg.setAttribute('aria-hidden','true');
+      this.pool=document.createElementNS(NS,'path');this.crest=document.createElementNS(NS,'path');
+      this.crest.setAttribute('fill','none');this.crest.setAttribute('stroke-width','2');this.crest.setAttribute('vector-effect','non-scaling-stroke');this.crest.setAttribute('stroke-linecap','round');
+      svg.append(this.pool,this.crest);el.prepend(svg);this.svg=svg;this.paint();
+    }
+    paint(){if(!this.svg)return;this.pool.style.fill=this.o.color||'var(--accent)';this.crest.style.stroke=this.o.crest||this.o.color||'var(--accent)';}
+    to(target,dur=700,ease='out'){
+      this.mount();
+      if(reduced||dur<=1){this.anim=null;this.level=target;this.calm=0;this.draw(0,0);if(target<=0.001)this.unmount();return this;}
+      this.anim={from:this.level,to:target,t0:performance.now(),dur,ease:E[ease]||E.out};
+      if(!this.raf)this.raf=requestAnimationFrame(t=>this.tick(t));return this;
+    }
+    tick(now){
+      const a=this.anim;let moving=0;
+      if(a){const k=Math.min(1,(now-a.t0)/a.dur);this.level=a.from+(a.to-a.from)*a.ease(k);moving=1-k;if(k>=1)this.anim=null;}
+      const idle=this.o.idle&&this.level>0.001&&this.level<0.999?this.o.idle:0;
+      this.calm=Math.max(moving,this.calm*0.94,idle);
+      this.draw((now-this.t0)/1000,this.calm);
+      if(this.anim||this.calm>0.01||idle)this.raf=requestAnimationFrame(t=>this.tick(t));
+      else{this.raf=0;if(this.level<=0.001)this.unmount();else this.draw(0,0);}
+    }
+    draw(s,agit){
+      const N=18,lvl=100*(1-this.level),amp=12*agit*(this.level>0.98?Math.max(0,(1-this.level)*50):1),x0=this.o.x??50,top=[];
+      for(let i=0;i<=N;i++){const x=100*i/N,dx=(x-x0)/100;top.push([x,lvl+Math.sin(dx*8-s*9)*amp+Math.cos(dx*3.3+s*5.5)*amp*.55]);}
+      const d=top.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+p[1].toFixed(1)).join('');
+      this.pool.setAttribute('d',d+'L100,104L0,104Z');this.crest.setAttribute('d',d);
+      this.crest.style.opacity=this.level>0.98||this.level<0.02?0:Math.min(1,agit*1.6)*.9;
+    }
+    unmount(){if(this.raf)cancelAnimationFrame(this.raf);this.raf=0;this.anim=null;this.svg&&this.svg.remove();this.svg=null;this.level=0;}
+  }
+  return {of(el,o){let l=map.get(el);if(!l){l=new L(el);map.set(el,l);}if(o){Object.assign(l.o,o);l.paint();}return l;},
+    // abscisse du doigt en % de l'élément
+    x(el,e){if(!e||e.clientX==null||(!e.clientX&&!e.clientY))return 50;const r=el.getBoundingClientRect();return r.width?clamp((e.clientX-r.left)/r.width*100,0,100):50;}};
+})();
+const LQ={tint:'color-mix(in srgb, var(--accent) 16%, var(--surface))',acc:'var(--accent)',rim:'var(--astral-rim)',play:'color-mix(in srgb, var(--accent) 70%, var(--surface))',stop:'color-mix(in srgb, var(--danger) 30%, transparent)',work:'color-mix(in srgb, var(--accent) 35%, var(--surface))',ring:'color-mix(in srgb, var(--accent) 55%, var(--surface))'};
+function haptic(){if(reduced)return;try{const n=window.VibrostaseNative;if(n&&n.vibrate)n.vibrate('12');else if(navigator.vibrate)navigator.vibrate(12);}catch(e){}}
+// travail en cours sur un bouton : se remplit pendant l'attente, puis se vide
+async function liquidWork(btn,job,{busy,done}={}){
+  const L=Liquid.of(btn,{color:LQ.work,crest:LQ.acc,idle:.4}),lab=btn.textContent;btn.disabled=true;if(busy)btn.textContent=busy;L.to(.8,1600,'out');
+  let r;try{r=await job();}finally{L.to(1,350,'out');if(done&&r!==false)btn.textContent=done;setTimeout(()=>{L.to(0,600,'in');setTimeout(()=>{btn.textContent=lab;btn.disabled=false;},600);},done&&r!==false?1300:300);}
+  return r;
+}
+let tileAnim=null;
 function renderPresetChips(){
   const box=$('#presetChips');box.innerHTML='';const cur=currentPreset();
-  const add=(id,label,seq)=>box.append(el('button',{type:'button',class:'tile','aria-pressed':String(!!cur&&cur.id===id),
-    onclick:()=>{settings.sequence=sanitizeSeq(clone(seq));commitSeq();renderSteps();}},[el('b',{text:label}),el('span',{text:fmtNum(seq.reduce((a,x)=>a+(+x.min||0),0))+' min'})]));
+  const A=tileAnim;tileAnim=null;
+  const add=(id,label,seq)=>{const on=!!cur&&cur.id===id;const b=el('button',{type:'button',class:'tile','aria-pressed':String(on),
+    onclick:e=>{if(on)return;tileAnim={from:cur&&cur.id,to:id,x:Liquid.x(b,e)};haptic();settings.sequence=sanitizeSeq(clone(seq));commitSeq();renderSteps();}},[el('b',{text:label}),el('span',{text:fmtNum(seq.reduce((a,x)=>a+(+x.min||0),0))+' min'})]);
+    box.append(b);const L=Liquid.of(b,{color:LQ.tint,crest:LQ.acc});
+    if(on){if(A&&A.to===id){L.o.x=A.x;L.to(1,750,'out');}else L.to(1,1);}
+    else if(A&&A.from===id){L.to(1,1);L.to(0,600,'in');}};
   for(const p of BUILTIN_PRESETS)add(p.id,p.label,p.seq);
   const u=Store.get('sequences',{})||{};for(const n of Object.keys(u))add('user:'+n,n,u[n]);
 }
@@ -2469,9 +2577,14 @@ function renderGroups(){
       t.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')return;longDone=false;clearTimeout(lp);lp=setTimeout(()=>{longDone=true;document.querySelectorAll('.fam.showrep').forEach(x=>x!==box&&x.classList.remove('showrep'));box.classList.add('showrep');},500);});
       for(const ev of ['pointerup','pointerleave','pointercancel'])t.addEventListener(ev,()=>clearTimeout(lp));
       t.addEventListener('contextmenu',e=>e.preventDefault());
-      t.addEventListener('click',e=>{if(longDone){longDone=false;e.preventDefault();return;}settings.families[f.id]=settings.families[f.id]===false;saveSettings();t.setAttribute('aria-pressed',String(settings.families[f.id]));updateSummaries();});
+      const TL=Liquid.of(t,{color:LQ.acc,crest:LQ.rim});if(settings.families[f.id]!==false)TL.to(1,1);
+      t.addEventListener('click',e=>{if(longDone){longDone=false;e.preventDefault();return;}settings.families[f.id]=settings.families[f.id]===false;saveSettings();const on=settings.families[f.id];t.setAttribute('aria-pressed',String(on));
+        TL.o.x=Liquid.x(t,e);TL.to(on?1:0,on?700:600,on?'out':'in');if(on)haptic();updateSummaries();});
       const r=el('button',{class:'rep',text:'⇄','aria-label':'Remplacer le son : '+f.label,title:'Remplacer ce son',onclick:()=>openRepSheet(sheet,f,box)});
-      box.append(t,el('button',{class:'play',text:'▶','aria-label':'Écouter : '+f.label,onclick:()=>preview(f)}),r);
+      const pb=el('button',{class:'play',text:'▶','aria-label':'Écouter : '+f.label});let pt=0;
+      const PL=Liquid.of(pb,{color:LQ.play,crest:LQ.rim}),pend=()=>{clearTimeout(pt);pt=0;pb.classList.remove('on');pb.textContent='▶';PL.to(0,500,'in');};
+      pb.onclick=async()=>{pb.classList.add('on');pb.textContent='■';PL.to(1,600,'out');clearTimeout(pt);const res=await preview(f);pt=setTimeout(pend,Math.max(.8,(res&&res.dur)||1.5)*1000+300);if(!res)pend();};
+      box.append(t,pb,r);
       wrap.append(box);
     }
     const grp=el('div',{class:'group'},[head,wrap,sheet]);
@@ -2528,6 +2641,7 @@ async function preview(f){
   const r=new Rng(newSeed());
   const res=playFamily(engine,f,engine.ctx.currentTime+0.08,{pan:r.range(-0.6,0.6),distance:0.4,gain:settings.eventLevel*0.9},r,effSamples());
   if(!res)showMsg('Aucun son importé dans cette catégorie.');
+  return res;
 }
 function showMsg(t){const m=$('#msg');m.textContent=t;m.hidden=!t;if(t)setTimeout(()=>{if(m.textContent===t)m.hidden=true;},6000);}
 
@@ -2944,10 +3058,21 @@ function legendFor(box,rec){
 }
 /* bilan : graphique annotable */
 let viewRec=null,graphGeom=null;
+let markAnim=null;
+function animMark(m){if(reduced||!m)return;markAnim={m,t0:performance.now()};const f=()=>{if(!markAnim)return;drawSumGraph();if(performance.now()-markAnim.t0<1100)requestAnimationFrame(f);else{markAnim=null;drawSumGraph();}};requestAnimationFrame(f);}
 function drawSumGraph(){
   const r=viewRec;if(!r||!r.track)return;
   const {g,w,h}=sizeCanvas($('#sumGraph'));
-  graphGeom=drawTrack(g,w,h,{samples:trackSamples(r.track),tmax:Math.max(r.actualSec||0,60),steps:r.steps,plannedSeq:null,jerks:r.track.jerks,noise:r.track.noise,marks:r.marks||[],clock:clockMode?r.startedAt:null});
+  const MA=markAnim,k=MA?(performance.now()-MA.t0)/1000:0,sm=trackSamples(r.track),tmx=Math.max(r.actualSec||0,60);
+  let pluck=null;if(MA&&k<.9&&graphGeom){pluck={x:graphGeom.X(MA.m.t),A:7*Math.pow(1-k/.9,2),s:k};}
+  graphGeom=drawTrack(g,w,h,{samples:sm,tmax:tmx,steps:r.steps,plannedSeq:null,jerks:r.track.jerks,noise:r.track.noise,marks:MA&&k<.95?(r.marks||[]).filter(x=>x!==MA.m):(r.marks||[]),clock:clockMode?r.startedAt:null,pluck});
+  if(MA&&k<.95){ // trait qui se dessine de haut en bas + halo sur la courbe
+    const G=graphGeom,x=G.X(MA.m.t),acc=cssVar('--accent')||'#a293ff',p=Math.min(1,k/.5),q=clamp((k-.25)/.7,0,1);
+    let st=null;for(const s of sm){if(s.t>MA.m.t)break;if(s.st>=0)st=s.st;}
+    g.save();g.strokeStyle=acc;g.lineWidth=2;g.globalAlpha=1-Math.max(0,(k-.75)/.2);g.beginPath();g.moveTo(x,G.T);g.lineTo(x,G.T+G.ph*(1-Math.pow(1-p,3)));g.stroke();
+    if(st!=null){const y=G.T+(st+0.5)*G.ph/STATES.length;g.globalAlpha=.45*(1-q);g.fillStyle=acc;g.beginPath();g.arc(x,y,4+16*q,0,Math.PI*2);g.fill();}
+    g.restore();
+  }
   if(markCursor!=null){
     const x=graphGeom.X(markCursor),acc=cssVar('--accent')||'#a293ff',lab=timeLabel(markCursor);
     g.save();g.strokeStyle=acc;g.lineWidth=2;g.beginPath();g.moveTo(x,graphGeom.T);g.lineTo(x,graphGeom.T+graphGeom.ph);g.stroke();
@@ -2982,7 +3107,7 @@ function renderSumCards(r){
 function renderMarkBar(){
   const bar=$('#markBar');bar.innerHTML='';const on=markCursor!=null;
   $('#markHint').textContent=on?`Ajouter un repère à ${timeLabel(markCursor)} :`:`Touche ou glisse le doigt sur le graphique pour choisir un moment. Touche l'axe du bas pour afficher ${clockMode?'les minutes de séance':"l'heure"}.`;
-  for(const [k,label] of Object.entries(MARKS))bar.append(el('button',{type:'button',class:'chip',text:'+ '+label,onclick:()=>{if(markCursor==null)return;viewRec.marks=(viewRec.marks||[]).concat([{t:Math.round(markCursor),k}]);markCursor=null;saveMarks();renderMarkBar();}}));
+  for(const [k,label] of Object.entries(MARKS))bar.append(el('button',{type:'button',class:'chip',text:'+ '+label,onclick:()=>{if(markCursor==null)return;const nm={t:Math.round(markCursor),k};viewRec.marks=(viewRec.marks||[]).concat([nm]);markCursor=null;haptic();saveMarks();animMark(nm);renderMarkBar();}}));
   bar.querySelectorAll('button').forEach(b=>b.disabled=!on);
 }
 function saveMarks(){
@@ -3001,7 +3126,7 @@ function openMarkSheet(t){
     return;
   }
   const chips=el('div',{class:'chips'});
-  for(const [k,label] of Object.entries(MARKS))chips.append(el('button',{type:'button',class:'chip',text:label,onclick:()=>{r.marks=(r.marks||[]).concat([{t:Math.round(t),k}]);box.hidden=true;saveMarks();}}));
+  for(const [k,label] of Object.entries(MARKS))chips.append(el('button',{type:'button',class:'chip',text:label,onclick:()=>{const nm={t:Math.round(t),k};r.marks=(r.marks||[]).concat([nm]);box.hidden=true;haptic();saveMarks();animMark(nm);}}));
   chips.append(el('button',{type:'button',class:'chip',text:'Annuler',onclick:()=>{box.hidden=true;}}));
   box.append(el('p',{text:`À ${fmtTime(t)}, tu as ressenti :`}),chips);
   box.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'});
@@ -3170,12 +3295,13 @@ function preflight(){
     const pt=placementText();prepIgnored=new Set();
     // 1. vérifications, sans décompte : la liste se met à jour en direct
     let phase='check',t0=0;
-    box.hidden=false;$('#prepStep').textContent='Avant de commencer';$('#prepCount').textContent='';$('#prepCount').hidden=true;
+    box.hidden=false;$('#prepStep').textContent='Avant de commencer';$('#prepNum').textContent='';$('#prepCount').hidden=true;$('#prepCount').classList.remove('ring');Liquid.of($('#prepCount')).unmount();
     $('#prepWhere').textContent="Vérifie que tout est prêt, installe-toi, puis touche « Je suis installé ». Tu auras encore 10 secondes.";
     $('#prepChecks').hidden=false;go.hidden=false;skipB.hidden=true;
+    {const n=(Store.get('history',[])||[]).length,t=$('#prepTip');t.hidden=n>=3;t.textContent=window.VibrostaseNative?'Première séances : vérifie que Vibrostase n\u2019est pas limité par la batterie (Paramètres Android › Applis › Vibrostase › Batterie › Sans restriction), sinon le son ou les capteurs peuvent s\u2019arrêter écran éteint.':'Garde l\u2019écran allumé (« Écran noir » l\u2019assombrit) : écran verrouillé, le navigateur peut couper le son.';}
     const refresh=()=>renderChecks();
     refresh();
-    go.onclick=()=>{if(phase!=='check')return;phase='install';t0=performance.now();go.hidden=true;skipB.hidden=false;$('#prepChecks').hidden=true;$('#prepCount').hidden=false;
+    go.onclick=()=>{if(phase!=='check')return;phase='install';$('#prepTip').hidden=true;t0=performance.now();go.hidden=true;skipB.hidden=false;$('#prepChecks').hidden=true;$('#prepCount').hidden=false;
       $('#prepStep').textContent='1 / 2 · Installe-toi';$('#prepWhere').textContent=pt.where;};
     skipB.onclick=()=>{skip=true;};
     let lastRefresh=0;
@@ -3184,17 +3310,17 @@ function preflight(){
       if(phase==='check'){const n=performance.now();if(n-lastRefresh>1000){lastRefresh=n;refresh();}PhoneSensors.poll();return;}
       const el_=(performance.now()-t0)/1000;
       if(phase==='install'){
-        const left=Math.ceil(10-el_);$('#prepCount').textContent=left>0?left:'';
+        const left=Math.ceil(10-el_);$('#prepNum').textContent=left>0?left:'';
         if(el_>=10||skip){
           skip=false;phase='calib';t0=performance.now();chime('start');PhoneSensors.poll(); // on repart de mesures propres
           calTr=new BodyTracker({position:settings.track.position});
-          $('#prepStep').textContent='2 / 2 · Calibration';
+          $('#prepStep').textContent='2 / 2 · Calibration';{const pc=$('#prepCount');pc.classList.add('ring');Liquid.of(pc,{color:LQ.ring,crest:LQ.rim,idle:.28}).to(0,1).to(1,CALIB*1000,'lin');}
           $('#prepWhere').textContent="Ne bouge plus et respire normalement, sans retenir ton souffle : on mesure ton niveau de repos, battements du cœur et respiration compris. Une note de bol marquera le début de la séance.";
         }
       }else{
         const d=PhoneSensors.poll(),hrv=settings.hr.source!=='none'&&hr.fresh?hr.smooth:null;
         calTr.update(Math.min(el_,CALIB),d,hrv,'stase');
-        const left=Math.ceil(CALIB-el_);$('#prepCount').textContent=left>0?left:'';
+        const left=Math.ceil(CALIB-el_);$('#prepNum').textContent=left>0?left:'';
         if(el_>=CALIB||skip){chime('end');const r=calTr.calibResult();finish(r);}
       }
     },250);
@@ -3261,8 +3387,8 @@ $('#runStage').addEventListener('click',()=>{if($('#runCtl').hidden)showRunCtl()
 $('#runCtl').addEventListener('pointerdown',()=>showRunCtl());$('#runCtl').addEventListener('input',()=>showRunCtl());
 let stopHold=null;
 const stopBtn=$('#btnStop'),HOLD=1200;
-function holdStart(e){if(prep){prep.cancel();return;}if(!session)return;e.preventDefault();try{stopBtn.setPointerCapture(e.pointerId);}catch(x){}stopBtn.classList.add('holding');stopHold=setTimeout(()=>{stopHold=null;stopBtn.classList.remove('holding');if(session)session.stop(false);},HOLD);}
-function holdEnd(){if(stopHold){clearTimeout(stopHold);stopHold=null;stopBtn.classList.remove('holding');showMsgRun('Maintiens le bouton appuyé pour arrêter.');}}
+function holdStart(e){if(prep){prep.cancel();return;}if(!session)return;e.preventDefault();try{stopBtn.setPointerCapture(e.pointerId);}catch(x){}stopBtn.classList.add('holding');Liquid.of(stopBtn,{color:LQ.stop,crest:'var(--danger)'}).to(1,HOLD,'lin');stopHold=setTimeout(()=>{stopHold=null;stopBtn.classList.remove('holding');haptic();if(session)session.stop(false);setTimeout(()=>Liquid.of(stopBtn).to(0,1),400);},HOLD);}
+function holdEnd(){if(stopHold){clearTimeout(stopHold);stopHold=null;stopBtn.classList.remove('holding');Liquid.of(stopBtn).to(0,450,'in');showMsgRun('Maintiens le bouton appuyé pour arrêter.');}}
 stopBtn.addEventListener('pointerdown',holdStart);stopBtn.addEventListener('pointerup',holdEnd);stopBtn.addEventListener('pointerleave',holdEnd);stopBtn.addEventListener('pointercancel',holdEnd);
 stopBtn.addEventListener('contextmenu',e=>e.preventDefault());stopBtn.addEventListener('selectstart',e=>e.preventDefault());
 // clavier : Entrée deux fois de suite arrête
@@ -3358,10 +3484,12 @@ const anAutoPossible=()=>!window.claude&&/^https:\/\/script\.google\.com\//.test
 const AN_INFO="Ces données servent uniquement à rendre la détection plus précise : EV, détente, endormissement, réveils, réactions aux sons. Elles sont anonymes : un identifiant tiré au hasard, rien sur toi, rien de ce qui se passe hors des séances. Contenu : mouvements du téléphone, cœur, respiration, volume sonore (jamais d'enregistrement du micro), déroulé, repères notés, date et heure de chaque séance, et ton profil court. Elles sont reçues par le créateur de Vibrostase et supprimées sur simple demande avec ton identifiant.";
 // envoi au script : texte brut pour éviter la requête préalable CORS ; si la réponse est illisible, on la tient pour reçue
 async function anPost(data){
+  // une seule requête : la renvoyer après une réponse illisible créait des doublons dans le Drive
+  if(navigator.onLine===false)return false;
   const body=JSON.stringify(Object.assign({key:ANALYSIS_KEY},data));
   try{const r=await fetch(ANALYSIS_ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body,redirect:'follow'});
-    const j=await r.json().catch(()=>null);return !!(j&&j.ok);}
-  catch(e){try{await fetch(ANALYSIS_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body});return true;}catch(e2){return false;}}
+    const j=await r.json().catch(()=>null);return !!(j&&j.ok)||r.type==='opaque';}
+  catch(e){return true;} // la requête est partie mais la réponse n'est pas lisible (CORS) : tenue pour reçue
 }
 let anSending=false;
 async function anAutoSend(){
@@ -3440,10 +3568,10 @@ async function buildAnalysis(list,fromCard){
 }
 function anMarkDone(ids){const p=anProfile();p.done=[...new Set(p.done.concat(ids))].slice(-2000);p.lastExport=new Date().toISOString();anSave(p);renderAnalysis();}
 $('#btnAnExport').addEventListener('click',async()=>{
-  const msg=$('#anMsg');msg.textContent='Préparation…';
+  const msg=$('#anMsg');msg.textContent='';
   const {data,ids,name}=await buildAnalysis();
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
-  const r=await saveFile(name,blob);
+  const r=await liquidWork($('#btnAnExport'),async()=>{const x=await saveFile(name,blob);return x==='saved'?x:false;},{busy:'Préparation…',done:'Exporté ✓'})||'declined';
   if(r==='saved'){anMarkDone(ids);msg.textContent=`Fichier prêt : ${ids.length} séance${ids.length>1?'s':''}, ${fmtSize(blob.size)}${window.VibrostaseNative?', dans le dossier Téléchargements':''}.`;}
   else msg.textContent=r==='declined'?'Enregistrement annulé.':'Téléchargement impossible ici.';
 });
@@ -3457,9 +3585,9 @@ $('#btnAnShare').addEventListener('click',async()=>{
 });
 for(const s of document.querySelectorAll('[data-an]'))s.addEventListener('change',()=>{const p=anProfile();p[s.dataset.an]=s.value||undefined;anSave(p);});
 $('#btnAnSend').addEventListener('click',async()=>{
-  const m=$('#anMsg');m.textContent='Envoi…';
+  const m=$('#anMsg'),btn=$('#btnAnSend');if(btn.dataset.busy)return;btn.dataset.busy='1';m.textContent='';
   const {data,ids}=await buildAnalysis();
-  const ok=await anPost(data);
+  const ok=await liquidWork(btn,()=>anPost(data),{busy:'Envoi…',done:'Envoyé ✓'});delete btn.dataset.busy;
   if(ok){anMarkDone(ids);m.textContent=`Envoyé : ${ids.length} séance${ids.length>1?'s':''}.`;}else m.textContent='Envoi impossible depuis cette page (connexion ou blocage). Utilise « Exporter mes données ».';
 });
 for(const id of ['#anNew','#anOk'])$(id).addEventListener('change',renderAnalysis);
@@ -3467,6 +3595,56 @@ $('#anNotes').addEventListener('change',()=>{const p=anProfile();p.noNotes=!$('#
 $('#anAuto').addEventListener('change',()=>{const p=anProfile();p.asked=true;p.consent=$('#anAuto').checked?'auto':'manual';anSave(p);renderAnalysis();if(p.consent==='auto')anAutoSend();});
 document.querySelector('[data-open="analysis"]').addEventListener('click',renderAnalysis);
 renderAnalysis();
+/* ===== guide de prise en main ===== */
+const GUIDE=[
+ {t:'Bienvenue',h:`<p>Vibrostase joue des sons qui imitent l'état vibratoire (EV), pour t'aider à le provoquer à la frontière du sommeil, et suit ton corps pendant la séance.</p><p>Ce guide prend une minute. Tu le retrouves dans <b>Réglages › Aide</b>.</p>`},
+ {t:'Avant de t’allonger',h:`<ul><li><b>Batterie</b> : dans les paramètres Android, mets Vibrostase en « Sans restriction ». Sinon le son ou les capteurs peuvent s'arrêter écran éteint.</li><li><b>« Ne pas déranger »</b> ou mode avion.</li><li><b>Montre</b> : active le partage de fréquence cardiaque, puis connecte-la dans Réglages › Montre cardio.</li><li><b>Casque, volume modéré</b> : pendant l'EV, des sons brusques peuvent surgir.</li></ul>`},
+ {t:'Choisir et créer un déroulé',h:`<p>Sur l'accueil, touche un <b>modèle</b> : son déroulé s'affiche en frise.</p><p><b>Modifier le déroulé</b> : ajoute des étapes (Détente, Montée, Palier, EV, Descente, Silence), règle leur durée et leur niveau.</p><p>Dans <b>Mes modèles</b>, donne un nom et touche « Enregistrer » : ton modèle rejoint les autres sur l'accueil.</p>`},
+ {t:'Lancer la séance',h:`<p>Touche <b>Démarrer</b>. Un écran vérifie la montre, la position du téléphone et la sortie audio.</p><p>Pose le téléphone <b>sur la poitrine</b> (mouvements et respiration) ou <b>sur le matelas</b> près du torse, puis touche « Je suis installé ».</p><p>Tu as 10 s pour te placer, puis <b>30 s immobile</b> : c'est la calibration.</p>`},
+ {t:'Pendant la séance',h:`<p>Le <b>graphique</b> suit ton état estimé, de l'éveil au sommeil profond. La couleur de la ligne indique le son joué.</p><p>C'est une estimation d'après tes mouvements, ton cœur et ta respiration, pas une mesure du sommeil.</p><p>Touche l'écran pour les commandes. <b>Maintiens</b> le bouton pour arrêter.</p>`},
+ {t:'Les repères',k:'Le plus important',h:`<p class="key">Après la séance, <b>touche le graphique</b> au moment où c'est arrivé, puis choisis : <b>Hypnagogie, Endormi, EV, Sortie, Réveil</b>…</p><p>Même approximatifs, pose-les à chaque séance. Tu peux aussi les ajouter plus tard depuis le <b>Journal</b>.</p><p>Ce sont tes repères qui permettent d'apprendre à reconnaître l'EV, l'endormissement et les réveils. Sans eux, la détection ne peut pas progresser.</p>`},
+ {t:'Réglages et sons',h:`<ul><li><b>Son</b> : contraste, intensité, pulsation pendant l'EV.</li><li><b>Sons secondaires</b> : active ou coupe chaque son, ▶ pour l'écouter.</li><li><b>Mes sons importés</b> : ajoute tes propres fichiers audio, ils remplacent le son de base de leur catégorie.</li><li><b>Suivi du corps</b> : position du téléphone, déroulé adaptatif, calibration.</li></ul>`},
+ {t:'Tes données',h:`<p>Tes séances restent <b>sur ce téléphone</b>. Fais une <b>Sauvegarde</b> de temps en temps.</p><p><b>Données d'analyse</b> : anonymes et limitées aux séances. Export à la main d'abord, puis envoi automatique si tu l'acceptes, révocable à tout moment.</p><p class="key"><b>Mise à jour</b> : installe le nouvel APK par-dessus, <b>sans désinstaller</b>, sinon tes séances sont effacées.</p>`},
+];
+function openGuide(i){
+  const T=$('#tuto');T.hidden=false;document.body.style.overflow='hidden';
+  i=Math.max(0,Math.min(GUIDE.length-1,i|0));const g=GUIDE[i];
+  $('#tutoKicker').textContent=g.k||`${i+1} / ${GUIDE.length}`;$('#tutoTitle').textContent=g.t;$('#tutoBody').innerHTML=g.h;
+  $('#tutoDots').replaceChildren(...GUIDE.map((_,k)=>el('i',{class:k===i?'on':''})));
+  const row=$('#tutoRow');row.replaceChildren();
+  if(i===0&&!Store.get('tutoSeen',false)){
+    row.append(el('button',{text:'Plus tard',onclick:()=>closeGuide()}),el('button',{text:'Voir la vidéo',onclick:()=>{closeGuide(false);go('page-help');const v=$('#helpVideo');try{v.play();}catch(e){}}}),el('button',{class:'primary',text:'Suivant',onclick:()=>openGuide(1)}));
+  }else{
+    row.append(el('button',{text:i?'Précédent':'Fermer',onclick:()=>i?openGuide(i-1):closeGuide()}),
+      el('button',{class:'primary',text:i<GUIDE.length-1?'Suivant':'C’est parti',onclick:()=>i<GUIDE.length-1?openGuide(i+1):closeGuide()}));
+  }
+  T.scrollTop=0;
+}
+function closeGuide(home=true){$('#tuto').hidden=true;document.body.style.overflow='';Store.set('tutoSeen',true);if(home){const t=document.querySelector('[data-tab=setup]');t&&t.click();window.scrollTo(0,0);}}
+// balayage gauche / droite
+{let x0=null;const T=$('#tuto');T.addEventListener('touchstart',e=>{x0=e.touches[0].clientX;},{passive:true});
+ T.addEventListener('touchend',e=>{if(x0==null)return;const dx=e.changedTouches[0].clientX-x0;x0=null;const i=GUIDE.findIndex(g=>g.t===$('#tutoTitle').textContent);if(Math.abs(dx)>60)openGuide(i+(dx<0?1:-1));});}
+$('#btnGuide').addEventListener('click',()=>openGuide(0));
+document.querySelector('[data-open="help"]').addEventListener('click',()=>{});
+// premier lancement de cette version : le guide s'ouvre une fois
+if(!Store.get('tutoSeen',false))openGuide(0);
+
+/* sélecteurs : la pastille glisse et s'étire comme un liquide */
+document.querySelectorAll('.segctl').forEach(seg=>{
+  const blob=el('i',{class:'blob'});seg.prepend(blob);seg.classList.add('blobbed');let cur=null,raf=0;
+  const target=()=>seg.querySelector('button[aria-pressed="true"]');
+  const geo=b=>b?{l:b.offsetLeft,r:b.offsetLeft+b.offsetWidth}:null;
+  const place=g=>{if(!g){blob.style.width='0';return;}blob.style.left=g.l+'px';blob.style.width=(g.r-g.l)+'px';};
+  const snap=()=>{cancelAnimationFrame(raf);cur=geo(target());place(cur);};
+  const glide=()=>{const to=geo(target());if(!to||!seg.offsetWidth)return snap();if(!cur||reduced||(cur.l===to.l&&cur.r===to.r))return snap();
+    const from=cur,dir=to.l>from.l?1:-1,t0=performance.now(),D=520,Ez=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;cancelAnimationFrame(raf);
+    const f=now=>{const k=Math.min(1,(now-t0)/D),lead=Ez(Math.min(1,k*1.35)),lag=Ez(Math.max(0,k*1.35-.35));
+      const l=dir>0?from.l+(to.l-from.l)*lag:from.l+(to.l-from.l)*lead,r=dir>0?from.r+(to.r-from.r)*lead:from.r+(to.r-from.r)*lag;
+      place({l,r});if(k<1)raf=requestAnimationFrame(f);else{cur=to;place(to);}};raf=requestAnimationFrame(f);};
+  new MutationObserver(glide).observe(seg,{attributes:true,subtree:true,attributeFilter:['aria-pressed']});
+  try{new ResizeObserver(snap).observe(seg);}catch(e){}
+  snap();
+});
 // mesures orphelines (séances supprimées ou sorties de l'historique) : on fait le ménage
 SampleDB.aKeys().then(k=>{const ids=new Set((Store.get('history',[])||[]).map(r=>r.id)),old=k.filter(x=>!ids.has(x));if(old.length)SampleDB.aDel(old);}).catch(()=>{});
 $('#btnImportBk').addEventListener('click',()=>$('#bkFile').click());
