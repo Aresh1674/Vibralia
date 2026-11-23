@@ -298,6 +298,9 @@ body.running{background:#05050f}
 .hold{position:relative;overflow:hidden}
 .hold .fill{position:absolute;inset:0;background:color-mix(in srgb,var(--danger) 30%,transparent);transform:scaleX(0);transform-origin:left}
 .hold.holding .fill{transform:scaleX(1);transition:transform 1.2s linear}
+/* appui long : ni sélection du texte, ni menu, ni défilement qui annulerait l'appui */
+.hold{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+.hold *{pointer-events:none;-webkit-user-select:none;user-select:none}
 .hold .lab{position:relative}
 /* installation : vérifications */
 .checks{list-style:none;margin:6px 0 0;padding:0;max-width:34em}
@@ -321,6 +324,14 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
 #prepGo{flex:1 1 100%}
 #prep{overflow-y:auto;justify-content:flex-start;padding-top:calc(56px + env(safe-area-inset-top,0px))}
 .ioswarn{color:var(--warm);margin:8px 0 0}
+.selbar{margin:0 0 12px}.selbar .row{flex-wrap:wrap;gap:8px;margin:0 0 6px}.selbar button{flex:1 1 auto}
+.fam button.rep{display:none;border-left:1px solid var(--line);padding:7px 10px;color:var(--accent);font-weight:600}
+@media (hover:hover){.fam:hover button.rep,.fam:focus-within button.rep{display:block}}
+.fam.showrep button.rep{display:block}
+.fam .rec{font-size:.7em;vertical-align:.15em}
+.repsheet{margin:10px 0 0}.repsheet .row{flex-wrap:wrap;gap:8px}.repsheet .row button{flex:1 1 auto}
+.fam .recb{color:#2fbf71}
+.fam button.toggle[aria-pressed="true"] .recb{color:#0d5c32}
 </style>
 </head>
 <body>
@@ -358,8 +369,11 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
   <!-- ============ JOURNAL ============ -->
   <section id="view-journal" class="tabview" hidden>
     <h1>Journal</h1>
-    <div class="jhead"><span class="hint" id="jCount"></span><button class="link" id="btnCmpMode" aria-pressed="false">Comparer</button></div>
-    <div class="row" id="cmpRow" hidden><button id="btnCmp" class="primary">Superposer</button><span class="hint" id="cmpHint"></span></div>
+    <div class="jhead"><span class="hint" id="jCount"></span><button class="link" id="btnCmpMode" aria-pressed="false">Sélectionner</button></div>
+    <div class="selbar" id="cmpRow" hidden>
+      <div class="row"><button id="btnSelAll">Tout cocher</button><button id="btnCmp" class="primary">Superposer</button><button id="btnDelSel" class="danger">Supprimer</button></div>
+      <span class="hint" id="cmpHint"></span>
+    </div>
     <ul class="hist" id="histList"></ul>
   </section>
 
@@ -373,7 +387,7 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
     <p class="grp">Téléphone</p>
     <div class="group-card"><button class="item" data-open="tech"><span class="it-t">Lecture et écran</span><span class="sum" id="sumTech"></span></button></div>
     <p class="grp">Données</p>
-    <div class="group-card"><button class="item" data-open="backup"><span class="it-t">Sauvegarde</span><span class="sum">Exporter, restaurer</span></button></div>
+    <div class="group-card"><button class="item" data-open="backup"><span class="it-t">Sauvegarde</span><span class="sum">Exporter, restaurer</span></button><button class="item" data-open="analysis"><span class="it-t">Données d'analyse</span><span class="sum" id="sumAna">Contribuer</span></button></div>
   </section>
 
   <section class="subpage" id="page-seq" hidden>
@@ -459,6 +473,7 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
           <div class="row">
             <select id="sampleFam" aria-label="Catégorie des sons importés"></select>
             <input id="sampleFile" type="file" accept="audio/*" multiple hidden>
+            <input id="repFile" type="file" accept="audio/*" multiple hidden>
             <button id="btnImport">Importer</button>
           </div>
           <ul class="samples" id="sampleList"></ul>
@@ -582,6 +597,38 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
       
     </div>
   </section>
+  <section class="subpage" id="page-analysis" hidden>
+    <header class="pagehead"><button class="back" data-back="settings">‹ Réglages</button><h2>Données d'analyse</h2></header>
+    <div class="pagebody">
+        <p class="hint">Les mesures de tes séances, seconde par seconde, pour affiner la détection. Plus il y a de participants, plus l'analyse devient fiable.</p>
+        <p class="hint">Ces données servent uniquement à rendre la détection plus précise : EV, détente, endormissement, réveils, réactions aux sons. Elles sont anonymes : un identifiant tiré au hasard, rien sur toi, rien de ce qui se passe hors des séances. Contenu : mouvements du téléphone, cœur, respiration, volume sonore (jamais d'enregistrement du micro), déroulé, repères notés, date et heure de chaque séance, et ton profil court. Elles sont reçues par le créateur de Vibrostase et supprimées sur simple demande avec ton identifiant.</p>
+        <p class="grp">Ton profil</p>
+        <div class="field"><label for="anShc">Sorties hors du corps vécues</label><span></span>
+          <select id="anShc" data-an="shc" style="grid-column:1 / -1"><option value="">Choisir…</option><option value="0">Aucune</option><option value="1-5">1 à 5</option><option value="6-30">6 à 30</option><option value="30+">Plus de 30</option></select></div>
+        <div class="field"><label for="anEvf">État vibratoire, d'habitude</label><span></span>
+          <select id="anEvf" data-an="evf" style="grid-column:1 / -1"><option value="">Choisir…</option><option value="never">Jamais ressenti</option><option value="rare">Quelques fois en tout</option><option value="month">Environ une fois par mois</option><option value="week">Chaque semaine</option><option value="often">Presque à chaque essai</option></select></div>
+        <div class="field"><label for="anAge">Tranche d'âge</label><span></span>
+          <select id="anAge" data-an="age" style="grid-column:1 / -1"><option value="">Choisir…</option><option value="18-24">18 à 24 ans</option><option value="25-34">25 à 34 ans</option><option value="35-44">35 à 44 ans</option><option value="45-54">45 à 54 ans</option><option value="55+">55 ans et plus</option></select></div>
+        <div class="field"><label for="anWatch">Montre ou ceinture</label><span></span>
+          <select id="anWatch" data-an="watch" style="grid-column:1 / -1"><option value="">Choisir…</option><option value="none">Aucune</option><option value="pixel">Pixel Watch</option><option value="galaxy">Galaxy Watch</option><option value="garmin">Garmin</option><option value="polar">Polar ou ceinture thoracique</option><option value="apple">Apple Watch</option><option value="other">Autre</option></select></div>
+        <p class="grp">Contenu</p>
+        <label class="check"><input type="checkbox" id="anNew" checked>
+          <span>Seulement les séances pas encore exportées<small id="anCount"></small></span></label>
+        <label class="check"><input type="checkbox" id="anNotes" checked>
+          <span>Inclure mes notes de ressenti<small>Le texte écrit sous chaque compte rendu. Décoche si tu y mets des choses personnelles.</small></span></label>
+        <label class="check"><input type="checkbox" id="anOk">
+          <span>J'accepte que ces données servent à améliorer Vibrostase</span></label>
+        <label class="check" id="anAutoRow" hidden><input type="checkbox" id="anAuto">
+          <span>Envoi automatique toutes les 10 séances<small id="anAutoInfo">Les mêmes données, envoyées sans rien faire. Décoche pour arrêter à tout moment.</small></span></label>
+        <div class="row">
+          <button id="btnAnExport" disabled>Exporter mes données</button>
+          <button id="btnAnShare" hidden disabled>Partager</button>
+          <button id="btnAnSend" hidden>Envoyer maintenant</button>
+        </div>
+        <p class="hint" id="anMsg"></p>
+        <p class="hint">Envoie le fichier à la personne qui t'a partagé l'appli. Ton identifiant anonyme : <b id="anPid"></b>. Donne-le pour faire retirer tes données.</p>
+    </div>
+  </section>
   <!-- ============ SÉANCE EN COURS ============ -->
   <section id="view-run" hidden>
     <div class="runhead">
@@ -630,6 +677,7 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
       <canvas id="sumGraph" class="graph" aria-label="État estimé pendant la séance. Touche un moment pour y placer un repère."></canvas>
       <ul class="legend" id="sumLegend"></ul>
       <p class="hint" id="markHint">Touche le graphique pour choisir un moment, puis ajoute un repère.</p>
+      <p class="hint" id="markNudge" hidden>Place tes repères (EV, endormi, réveil…) même approximatifs : sans eux, la séance aide peu à affiner la détection.</p>
       <div class="chips marks" id="markBar"></div>
       <div class="sheet" id="markSheet" hidden></div>
     </div>
@@ -644,8 +692,15 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
       <button id="btnCopy" class="primary">Copier le résumé</button>
       <button id="btnPng">Exporter l'image</button>
       <button id="btnReplay">Rejouer cette séance</button>
+      <button id="btnDelRec" class="danger">Supprimer cette séance</button>
     </div>
     <p class="hint" id="copyMsg"></p><p class="hint" id="pngMsg"></p>
+    <div class="sheet" id="anBox" hidden>
+      <p><b id="anBoxT">Aider à améliorer la détection</b></p>
+      <p class="hint" id="anBoxInfo"></p>
+      <div class="row" id="anBoxRow"></div>
+      <p class="hint" id="anBoxMsg"></p>
+    </div>
   </section>
 </main>
 <nav id="tabbar" aria-label="Navigation">
@@ -720,12 +775,17 @@ const SampleDB={
   async open(){
     if(this.db)return this.db;
     if(!('indexedDB' in window))throw new Error('Stockage des sons indisponible dans ce navigateur.');
-    this.db=await new Promise((res,rej)=>{const r=indexedDB.open('vibrostase',1);r.onupgradeneeded=()=>r.result.createObjectStore('samples',{keyPath:'id'});r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+    this.db=await new Promise((res,rej)=>{const r=indexedDB.open('vibrostase',2);r.onupgradeneeded=()=>{const d=r.result;for(const n of ['samples','analysis'])if(!d.objectStoreNames.contains(n))d.createObjectStore(n,{keyPath:'id'});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
     return this.db;
   },
   async all(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('samples').objectStore('samples').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
   async put(rec){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('samples','readwrite');t.objectStore('samples').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
-  async del(id){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('samples','readwrite');t.objectStore('samples').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
+  async del(id){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('samples','readwrite');t.objectStore('samples').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  // mesures détaillées de chaque séance (seconde par seconde), pour l'export d'analyse
+  async aGet(id){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('analysis').objectStore('analysis').get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);});},
+  async aKeys(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('analysis').objectStore('analysis').getAllKeys();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
+  async aPut(rec){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('analysis','readwrite');t.objectStore('analysis').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  async aDel(ids){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('analysis','readwrite');for(const id of ids)t.objectStore('analysis').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
 };
 
 /* ---------- 2. Catalogue ---------- */
@@ -757,7 +817,7 @@ const BUILTIN_PRESETS=[
 ];
 const GROUPS=[
   {id:'corps',label:'Corps et électricité'},
-  {id:'voix',label:'Voix synthétiques (étranges)'},
+  {id:'voix',label:'Voix et animaux'},
   {id:'maison',label:'Maison'},
   {id:'dehors',label:'Dehors et transports'},
   {id:'rituel',label:'Musique et rituel'},
@@ -829,6 +889,7 @@ const DEFAULTS={
   volume:0.5, contrast:'medium', maxIntensity:0.85, baseFreq:55, sweepDepth:0.45, binaural:true, binauralBeat:6,
   pulseDepth:0.8, density:0.5, eventLevel:0.6, evDensity:0.7, evFocusChance:0.5, eerie:0.25,
   families:Object.fromEntries(FAMILIES.map(f=>[f.id,true])),
+  mixSynth:{}, // familles où le son d'origine reste tiré au hasard avec les enregistrements importés
   showEvents:true,
   hr:{source:'none',waitCalm:true,calmDrop:5,maxWait:10,guard:true},
   track:{enabled:true,position:'mattress',noise:true,adaptive:false,sleepSkip:5,evHold:8,calib:true},
@@ -854,6 +915,7 @@ function loadSettings(){
   s.sequence=sanitizeSeq(s.sequence);s.version=4;
   if(!['mattress','chest','none'].includes(s.track.position))s.track.position='mattress';
   if(!['soft','medium','strong'].includes(s.contrast))s.contrast='medium';
+  if(!s.mixSynth||typeof s.mixSynth!=='object'||Array.isArray(s.mixSynth))s.mixSynth={};
   return s;
 }
 
@@ -1420,13 +1482,17 @@ function offlineEngine(live,len,sr){
 }
 function playSample(e,t,p,r,s){
   const ctx=e.ctx,src=ctx.createBufferSource();src.buffer=s.buffer;const rate=r.range(0.93,1.07);src.playbackRate.value=rate;
-  const dur=Math.min(20,s.buffer.duration/rate),ch=eventChain(e,t,p,dur),g=G(ctx,0);
+  // long enregistrement (plus de 10 s) : on en joue un extrait pris au hasard, pour varier sans tout rejouer
+  const full=s.buffer.duration,len=p.rh?Math.min(full,20):full>10?Math.min(full,r.range(3.5,8)):full,off=!p.rh&&full>10?r.range(0,full-len):0; // son rythmé en EV concentré : joué en entier, pour garder un tempo régulier
+  const dur=Math.min(20,len/rate),ch=eventChain(e,t,p,dur),g=G(ctx,0);
   g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1,t+0.06);g.gain.setValueAtTime(1,Math.max(t+0.06,t+dur-0.4));g.gain.linearRampToValueAtTime(0,t+dur);
-  src.connect(g);g.connect(ch.input);src.start(t);src.stop(t+dur+0.05);return dur;
+  src.connect(g);g.connect(ch.input);src.start(t,off);src.stop(t+dur+0.05);return dur;
 }
 function playFamily(e,fam,t,p,r,samples,allowSynth=true){
   const pool=samples.filter(s=>s.family===fam.id&&s.buffer),synth=allowSynth&&!fam.noSynth&&Synth[fam.id];
-  if(pool.length&&(!synth||r.chance(0.5))){const s=r.pick(pool);return {label:s.name,dur:playSample(e,t,p,r,s)};}
+  // un enregistrement importé remplace le son d'origine, sauf si l'on a choisi de les mélanger
+  const mix=typeof settings!=='undefined'&&settings.mixSynth&&settings.mixSynth[fam.id];
+  if(pool.length&&(!synth||!mix||r.chance(0.5))){const s=r.pick(pool);return {label:s.name,dur:playSample(e,t,p,r,s)};}
   if(synth)return {label:fam.label,dur:synth(e,t,p,r)};
   return null;
 }
@@ -1529,6 +1595,7 @@ class EventScheduler{
     const res=this.play(fam,when,p,true);if(!res)return null;
     this.busy.push(when+(res.dur||2));this.onEvent&&this.onEvent({id:fam.id,label:res.label,pan:p.pan,distance:p.distance,t,ev:true});
     if(rhythmic&&p.next)return p.next;
+    if(rhythmic&&res.dur)return when+Math.max(0.5,res.dur-0.4); // enregistrement : extraits enchaînés en fondu
     const d=res.dur||1;return when+clamp(d*(d>5?this.rng.range(0.6,0.95):this.rng.range(0.35,0.85)),0.08,10);
   }
   fire(when,t,level,mode){
@@ -1637,6 +1704,8 @@ class BodyTracker{
     this.sleepStart=null;this.sleepEntry=null;this.sleepMin=null;this.evSince=null;this.lastEvT=-1e9;
     this.hrBase=null;this.hrRef=[];this.br={rate:null,cv:null};this.info={};
     this.src={acc:false,hr:false,mic:false};this.err='';
+    // journal brut pour l'export d'analyse : par seconde (mouvement, bruit, cœur), respiration à 2 Hz, diagnostic toutes les 5 s
+    this.raw={mv:[],pk:[],nz:[],hr:[],bx:[],by:[],bz:[],d:{imm:[],brr:[],brcv:[],drop:[],jump:[],hrsd:[],act:[],thr:[],nzb:[]}};
   }
   /* --- entrées --- */
   // d : {clockNow, a:[[ms,x,y,z]…], m:[[ms,dB]…], accOk, micOk, err} ; P : temps de séance entendu (s)
@@ -1645,7 +1714,7 @@ class BodyTracker{
     if(d.a)for(const s of d.a)this._acc(map(s[0]),s[1],s[2],s[3]);
     if(d.m)for(const s of d.m)this._noise(map(s[0]),s[1]);
     if(d.err)this.err=d.err;
-    if(hrv!=null&&P>0){this.hrS.push([P,hrv]);this.lastHrT=P;this.src.hr=true;if(this.hrS.length>1200)this.hrS.splice(0,300);}
+    if(hrv!=null&&P>0){const k=Math.floor(P);if(k<14400)this.raw.hr[k]=Math.round(hrv*10)/10;this.hrS.push([P,hrv]);this.lastHrT=P;this.src.hr=true;if(this.hrS.length>1200)this.hrS.splice(0,300);}
     while(this.nextEval<=P){this._eval(this.nextEval,blk);this.nextEval+=TRACK_DT;}
   }
   _acc(t,x,y,z){
@@ -1657,7 +1726,8 @@ class BodyTracker{
     for(let i=0;i<3;i++){const hp=a[i]-f.fast[i];hp2+=hp*hp;f.fast[i]+=kf*(a[i]-f.fast[i]);f.slow[i]+=ks*(a[i]-f.slow[i]);br[i]=f.fast[i]-f.slow[i];}
     // respiration : bande lente (inclinaison du téléphone), échantillonnée à 4 Hz
     const q=Math.floor(t*4);
-    if(this.brAcc&&this.brAcc.q!==q){const b=this.brAcc;this.brBuf.push([b.q/4,b.v[0]/b.n,b.v[1]/b.n,b.v[2]/b.n]);if(this.brBuf.length>480)this.brBuf.splice(0,120);this.brAcc=null;}
+    if(this.brAcc&&this.brAcc.q!==q){const b=this.brAcc;this.brBuf.push([b.q/4,b.v[0]/b.n,b.v[1]/b.n,b.v[2]/b.n]);
+      if(b.q%2===0&&b.q<115200){const k=b.q/2,R=this.raw;R.bx[k]=Math.round(b.v[0]/b.n*1e4);R.by[k]=Math.round(b.v[1]/b.n*1e4);R.bz[k]=Math.round(b.v[2]/b.n*1e4);}if(this.brBuf.length>480)this.brBuf.splice(0,120);this.brAcc=null;}
     if(!this.brAcc)this.brAcc={q,v:[0,0,0],n:0};
     for(let i=0;i<3;i++)this.brAcc.v[i]+=br[i];this.brAcc.n++;
     // mouvement : énergie au-dessus de ~0,6 Hz, par seconde
@@ -1668,6 +1738,7 @@ class BodyTracker{
   }
   _second(b){
     const v=Math.sqrt(b.hp2/Math.max(1,b.n)),t=b.sec+1;
+    if(b.sec>=0&&b.sec<14400){this.raw.mv[b.sec]=Math.round(v*1000);this.raw.pk[b.sec]=Math.round(b.peak*1000);}
     if(t<=this.calib){this.calibMove.push(v);if(t===this.calib||this.calibMove.length>=25){const q=[...this.calibMove].sort((x,y)=>x-y)[Math.floor(this.calibMove.length*0.2)];this.thrMove=clamp(q*4,this.o.position==='chest'?0.08:0.05,0.25);this.jerkThr=Math.max(0.4,this.thrMove*3);}}
     this.moveSec.push([t,v]);if(this.moveSec.length>900)this.moveSec.splice(0,300);
     if(t>this.calib&&t%10===0){
@@ -1688,6 +1759,7 @@ class BodyTracker{
   _noise(t,db){
     if(!Number.isFinite(t)||t<0||!Number.isFinite(db))return;
     this.src.mic=true;
+    {const k=Math.floor(t);if(k<14400){const r=this.raw.nz;r[k]=r[k]==null?Math.round(db):Math.max(r[k],Math.round(db));}}
     if(t<=this.calib){this.calibNoise.push(db);this.noiseBase=median(this.calibNoise);return;}
     if(this.noiseBase==null)this.noiseBase=db;
     const over=db-this.noiseBase;
@@ -1771,6 +1843,9 @@ class BodyTracker{
       if(act&&(s===ST.ev||s===ST.rem))this.lastEvT=t;
       this.info={imm,moving,hr:hrF,br,act};
     }
+    {const D=this.raw.d,i=this.info||{},h=i.hr,r1=x=>x==null||!Number.isFinite(x)?null:Math.round(x*10)/10;
+      D.imm.push(i.imm==null||!Number.isFinite(i.imm)?null:Math.round(i.imm));D.brr.push(r1(i.br&&i.br.rate));D.brcv.push(i.br&&i.br.cv!=null?Math.round(i.br.cv*100)/100:null);
+      D.drop.push(r1(h&&h.drop));D.jump.push(r1(h&&h.jump));D.hrsd.push(r1(h&&h.sd));D.act.push(i.act?1:0);D.thr.push(Math.round(this.thrMove*1000));D.nzb.push(this.noiseBase==null?null:Math.round(this.noiseBase));}
     // suivi du sommeil
     if(SLEEPING(s)){if(this.sleepStart==null)this.sleepStart=t;if(this.sleepEntry==null)this.sleepEntry=t;}
     else{this.sleepEntry=null;if(s===ST.wake||s===ST.relax||s===ST.stase)this.sleepStart=null;}
@@ -1790,7 +1865,7 @@ class BodyTracker{
     if(c.acc){this.thrMove=c.thrMove;this.jerkThr=c.jerkThr;if(!c.moved)this.lastMoveT=-30;}
     if(c.noiseBase!=null)this.noiseBase=c.noiseBase;
     if(c.hr.length>=10){this.hrRef=c.hr.slice(-24);this.hrBase=median(this.hrRef);}
-    this.precal=true;
+    this.precal=true;this.calRes=c;
   }
   // pour le déroulé adaptatif
   get asleepFor(){return this.sleepEntry==null?0:Math.max(0,this.nextEval-TRACK_DT-this.sleepEntry);}
@@ -1798,6 +1873,15 @@ class BodyTracker{
   export(){
     return {v:1,dt:TRACK_DT,pos:this.o.position,precal:this.precal||undefined,st:this.samples.map(x=>x.st),hr:this.samples.map(x=>x.hr),bk:this.samples.map(x=>x.bk),br:this.samples.map(x=>x.br),
       jerks:this.jerks,noise:this.noise,src:Object.assign({},this.src),err:this.err||undefined};
+  }
+  // mesures détaillées, coupées à la durée réelle (trous = null)
+  exportRaw(sec){
+    const R=this.raw,cut=(a,n)=>Array.from({length:Math.min(n,a.length)},(_,i)=>a[i]??null),n5=Math.floor(sec/TRACK_DT),D={};
+    for(const [k,a] of Object.entries(R.d))D[k]=a.slice(0,n5);
+    const c=this.calRes;
+    return {v:1,pos:this.o.position,calibSec:this.calib,mv:cut(R.mv,sec),pk:cut(R.pk,sec),nz:cut(R.nz,sec),hr:cut(R.hr,sec),br:{hz:2,x:cut(R.bx,sec*2),y:cut(R.by,sec*2),z:cut(R.bz,sec*2)},
+      diag:D,thrMove:Math.round(this.thrMove*1000),jerkThr:Math.round(this.jerkThr*1000),noiseBase:this.noiseBase==null?null:Math.round(this.noiseBase),hrBase:this.hrBase==null?null:Math.round(this.hrBase*10)/10,
+      precal:c?{thrMove:Math.round(c.thrMove*1000),jerkThr:Math.round(c.jerkThr*1000),noiseBase:c.noiseBase==null?null:Math.round(c.noiseBase),hr:c.hr.map(x=>Math.round(x)),moved:!!c.moved}:null};
   }
 }
 function trackSamples(tr){return (tr&&Array.isArray(tr.st))?tr.st.map((st,i)=>({t:(i+1)*(tr.dt||TRACK_DT),st:(st>=-1&&st<=6)?st:-1,hr:(tr.hr&&tr.hr[i])||0,bk:clamp((tr.bk&&tr.bk[i])|0,0,5)})):[];}
@@ -2132,7 +2216,7 @@ class Session{
     const cnt={};let evn=0;for(const x of r.events){cnt[x.id]=(cnt[x.id]||0)+1;if(x.ev)evn++;}
     // nombre de sons pendant chaque étape, et fin de chaque étape
     r.steps.forEach((st,k)=>{const end=k+1<r.steps.length?r.steps[k+1].t:r.actualSec;st.end=end;st.n=r.events.filter(x=>x.t>=st.t&&x.t<end).length;});
-    r.eventCounts=cnt;r.eventTotal=r.events.length;r.evEventTotal=evn;delete r.events;
+    r.eventCounts=cnt;r.eventTotal=r.events.length;r.evEventTotal=evn;Object.defineProperty(r,'_events',{value:r.events,enumerable:false});delete r.events;
     const ser=r.hr.series.map(x=>x[1]);if(ser.length){r.hr.min=Math.min(...ser);r.hr.max=Math.max(...ser);}
     this.onEnd&&this.onEnd(r);
   }
@@ -2181,6 +2265,22 @@ const $=q=>document.querySelector(q);
 const el=(tag,props={},kids=[])=>{const n=document.createElement(tag);for(const [k,v] of Object.entries(props)){if(k==='text')n.textContent=v;else if(k==='class')n.className=v;else if(k.startsWith('on'))n.addEventListener(k.slice(2),v);else n.setAttribute(k,v);}for(const c of [].concat(kids))if(c)n.append(c);return n;};
 const engine=new AudioEngine(),hr=new HeartRate();
 let settings=loadSettings();
+// sons intégrés à l'appli : remplacent le son synthétique de leur catégorie pour tout le monde ;
+// un son importé sur l'appareil reste prioritaire.
+const BUILTIN_SOUNDS=[{"family": "heartbeat", "name": "battements-de-coeur-1", "file": "sons/battements-de-coeur-1.mp3"}, {"family": "crackle", "name": "gresillement-1", "file": "sons/gresillement-1.mp3"}, {"family": "whistle", "name": "sifflement-1", "file": "sons/sifflement-1.mp3"}, {"family": "static", "name": "neige-de-tele-1", "file": "sons/neige-de-tele-1.mp3"}, {"family": "breath", "name": "souffle-1", "file": "sons/souffle-1.mp3"}, {"family": "zap", "name": "arc-electrique-1", "file": "sons/arc-electrique-1.mp3"}, {"family": "mosquito", "name": "moustique-1", "file": "sons/moustique-1.mp3"}, {"family": "steamtrain", "name": "train-vapeur-1", "file": "sons/train-vapeur-1.mp3"}, {"family": "steamtrain", "name": "train-vapeur-2", "file": "sons/train-vapeur-2.mp3"}, {"family": "firecracker", "name": "petard-1", "file": "sons/petard-1.mp3"}, {"family": "firecracker", "name": "petard-2", "file": "sons/petard-2.mp3"}, {"family": "firecracker", "name": "petard-3", "file": "sons/petard-3.mp3"}, {"family": "clap", "name": "claquement-1", "file": "sons/claquement-1.mp3"}, {"family": "clap", "name": "claquement-2", "file": "sons/claquement-2.mp3"}, {"family": "clap", "name": "claquement-3", "file": "sons/claquement-3.mp3"}, {"family": "bark", "name": "chien-1", "file": "sons/chien-1.mp3"}, {"family": "bark", "name": "chien-2", "file": "sons/chien-2.mp3"}, {"family": "meow", "name": "chat-1", "file": "sons/chat-1.mp3"}, {"family": "meow", "name": "chat-2", "file": "sons/chat-2.mp3"}, {"family": "laugh", "name": "rires-1", "file": "sons/rires-1.mp3"}, {"family": "laugh", "name": "rires-2", "file": "sons/rires-2.mp3"}, {"family": "choir", "name": "choeur-1", "file": "sons/choeur-1.mp3"}, {"family": "choir", "name": "choeur-2", "file": "sons/choeur-2.mp3"}, {"family": "tinnitus", "name": "acouphene-1", "file": "sons/acouphene-1.mp3"}, {"family": "tinnitus", "name": "acouphene-2", "file": "sons/acouphene-2.mp3"}, {"family": "steps", "name": "pas-1", "file": "sons/pas-1.mp3"}, {"family": "steps", "name": "pas-2", "file": "sons/pas-2.mp3"}, {"family": "knock", "name": "toc-toc-1", "file": "sons/toc-toc-1.mp3"}, {"family": "knock", "name": "toc-toc-2", "file": "sons/toc-toc-2.mp3"}, {"family": "creak", "name": "porte-grince-1", "file": "sons/porte-grince-1.mp3"}, {"family": "slam", "name": "porte-claque-1", "file": "sons/porte-claque-1.mp3"}, {"family": "slam", "name": "porte-claque-2", "file": "sons/porte-claque-2.mp3"}, {"family": "keys", "name": "cles-1", "file": "sons/cles-1.mp3"}, {"family": "keys", "name": "cles-2", "file": "sons/cles-2.mp3"}, {"family": "metal", "name": "casseroles-1", "file": "sons/casseroles-1.mp3"}, {"family": "glass", "name": "verre-brise-1", "file": "sons/verre-brise-1.mp3"}, {"family": "glass", "name": "verre-brise-2", "file": "sons/verre-brise-2.mp3"}, {"family": "phone", "name": "telephone-1", "file": "sons/telephone-1.mp3"}, {"family": "phone", "name": "telephone-2", "file": "sons/telephone-2.mp3"}, {"family": "doorbell", "name": "sonnette-1", "file": "sons/sonnette-1.mp3"}, {"family": "doorbell", "name": "sonnette-2", "file": "sons/sonnette-2.mp3"}, {"family": "clock", "name": "horloge-1", "file": "sons/horloge-1.mp3"}, {"family": "clock", "name": "horloge-2", "file": "sons/horloge-2.mp3"}, {"family": "drip", "name": "gouttes-1", "file": "sons/gouttes-1.mp3"}, {"family": "drip", "name": "gouttes-2", "file": "sons/gouttes-2.mp3"}, {"family": "washer", "name": "machine-a-laver-1", "file": "sons/machine-a-laver-1.mp3"}, {"family": "washer", "name": "machine-a-laver-2", "file": "sons/machine-a-laver-2.mp3"}, {"family": "snore", "name": "ronflement-1", "file": "sons/ronflement-1.mp3"}, {"family": "snore", "name": "ronflement-2", "file": "sons/ronflement-2.mp3"}, {"family": "paper", "name": "papier-1", "file": "sons/papier-1.mp3"}, {"family": "paper", "name": "papier-2", "file": "sons/papier-2.mp3"}, {"family": "train", "name": "train-1", "file": "sons/train-1.mp3"}, {"family": "train", "name": "train-2", "file": "sons/train-2.mp3"}, {"family": "siren", "name": "sirene-1", "file": "sons/sirene-1.mp3"}, {"family": "siren", "name": "sirene-2", "file": "sons/sirene-2.mp3"}, {"family": "car", "name": "voiture-1", "file": "sons/voiture-1.mp3"}, {"family": "car", "name": "voiture-2", "file": "sons/voiture-2.mp3"}, {"family": "horn", "name": "klaxon-1", "file": "sons/klaxon-1.mp3"}, {"family": "horn", "name": "klaxon-2", "file": "sons/klaxon-2.mp3"}, {"family": "plane", "name": "avion-1", "file": "sons/avion-1.mp3"}, {"family": "plane", "name": "avion-2", "file": "sons/avion-2.mp3"}, {"family": "heli", "name": "helicoptere-1", "file": "sons/helicoptere-1.mp3"}, {"family": "heli", "name": "helicoptere-2", "file": "sons/helicoptere-2.mp3"}, {"family": "thunder", "name": "orage-1", "file": "sons/orage-1.mp3"}, {"family": "thunder", "name": "orage-2", "file": "sons/orage-2.mp3"}, {"family": "wind", "name": "vent-1", "file": "sons/vent-1.mp3"}, {"family": "wind", "name": "vent-2", "file": "sons/vent-2.mp3"}, {"family": "rain", "name": "pluie-1", "file": "sons/pluie-1.mp3"}, {"family": "rain", "name": "pluie-2", "file": "sons/pluie-2.mp3"}, {"family": "birds", "name": "oiseaux-1", "file": "sons/oiseaux-1.mp3"}, {"family": "birds", "name": "oiseaux-2", "file": "sons/oiseaux-2.mp3"}, {"family": "foghorn", "name": "corne-1", "file": "sons/corne-1.mp3"}, {"family": "foghorn", "name": "corne-2", "file": "sons/corne-2.mp3"}, {"family": "music", "name": "boite-a-musique-1", "file": "sons/boite-a-musique-1.mp3"}, {"family": "music", "name": "boite-a-musique-2", "file": "sons/boite-a-musique-2.mp3"}, {"family": "bell", "name": "tintements-1", "file": "sons/tintements-1.mp3"}, {"family": "bell", "name": "tintements-2", "file": "sons/tintements-2.mp3"}, {"family": "church", "name": "cloche-eglise-1", "file": "sons/cloche-eglise-1.mp3"}, {"family": "church", "name": "cloche-eglise-2", "file": "sons/cloche-eglise-2.mp3"}, {"family": "gong", "name": "gong-1", "file": "sons/gong-1.mp3"}, {"family": "gong", "name": "gong-2", "file": "sons/gong-2.mp3"}, {"family": "bowl", "name": "bol-chantant-1", "file": "sons/bol-chantant-1.mp3"}, {"family": "bowl", "name": "bol-chantant-2", "file": "sons/bol-chantant-2.mp3"}, {"family": "flute", "name": "flute-1", "file": "sons/flute-1.mp3"}, {"family": "flute", "name": "flute-2", "file": "sons/flute-2.mp3"}, {"family": "thud", "name": "coup-sourd-1", "file": "sons/coup-sourd-1.mp3"}, {"family": "thud", "name": "coup-sourd-2", "file": "sons/coup-sourd-2.mp3"}, {"family": "blast", "name": "detonation-1", "file": "sons/detonation-1.mp3"}, {"family": "blast", "name": "detonation-2", "file": "sons/detonation-2.mp3"}, {"family": "voices", "name": "voix-lointaines-fr-1", "file": "sons/voix-lointaines-fr-1.mp3"}, {"family": "voices", "name": "voix-lointaines-fr-2", "file": "sons/voix-lointaines-fr-2.mp3"}, {"family": "crowd", "name": "foule-fr-1", "file": "sons/foule-fr-1.mp3"}, {"family": "crowd", "name": "foule-fr-2", "file": "sons/foule-fr-2.mp3"}, {"family": "radio", "name": "voix-radio-fr-1", "file": "sons/voix-radio-fr-1.mp3"}, {"family": "radio", "name": "voix-radio-fr-2", "file": "sons/voix-radio-fr-2.mp3"}, {"family": "radio", "name": "voix-radio-fr-3", "file": "sons/voix-radio-fr-3.mp3"}, {"family": "shout", "name": "appel-fr-1", "file": "sons/appel-fr-1.mp3"}, {"family": "shout", "name": "appel-fr-2", "file": "sons/appel-fr-2.mp3"}, {"family": "whisper", "name": "chuchotements-fr-1", "file": "sons/chuchotements-fr-1.mp3"}, {"family": "drums", "name": "tambour-chamanique-1", "file": "sons/tambour-chamanique-1.mp3"}, {"family": "drums", "name": "tambour-chamanique-2", "file": "sons/tambour-chamanique-2.mp3"}];
+const MARK_BUILTIN=true; // provisoire : point vert sur les catégories qui ont un enregistrement intégré
+let builtins=BUILTIN_SOUNDS.map(b=>({id:'b:'+b.name,name:b.name,family:b.family,file:b.file,builtin:true,buffer:null}));
+let builtinsLoading=null;
+function loadBuiltins(){
+  if(builtinsLoading||!engine.ctx)return builtinsLoading;
+  builtinsLoading=Promise.all(builtins.map(async b=>{
+    if(b.buffer||b.bad)return;
+    try{const r=await fetch(b.file);if(!r.ok)throw new Error(r.status);b.buffer=await engine.ctx.decodeAudioData(await r.arrayBuffer());}catch(e){b.bad=true;}
+  })).then(()=>{builtinsLoading=null;});
+  return builtinsLoading;
+}
+// sons réellement utilisés : ceux importés sur l'appareil, sinon ceux intégrés à l'appli
+function effSamples(){const mine=new Set(samples.map(s=>s.family));return samples.concat(builtins.filter(b=>!mine.has(b.family)));}
 let samples=[],session=null,lastRecord=null,wakeLock=null,rafId=0,rings=[];
 const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -2358,23 +2458,75 @@ function renderGroups(){
     const setAll=on=>{for(const f of fams)settings.families[f.id]=on;saveSettings();renderGroups();updateSummaries();};
     const head=el('h3',{},[el('span',{text:g.label}),el('span',{},[el('button',{text:'Tout',onclick:()=>setAll(true)}),el('button',{text:'Aucun',onclick:()=>setAll(false)})])]);
     head.firstChild.style.display='inline';
+    const sheet=el('div',{class:'sheet repsheet',hidden:true});
     for(const f of fams){
-      const t=el('button',{class:'toggle',text:f.label,'aria-pressed':String(settings.families[f.id]!==false)});
-      t.addEventListener('click',()=>{settings.families[f.id]=settings.families[f.id]===false;saveSettings();t.setAttribute('aria-pressed',String(settings.families[f.id]));updateSummaries();});
-      wrap.append(el('div',{class:'fam'},[t,el('button',{class:'play',text:'▶','aria-label':'Écouter : '+f.label,onclick:()=>preview(f)})]));
+      const real=samples.filter(x=>x.family===f.id).length,mixed=real&&settings.mixSynth[f.id]&&!f.noSynth;
+      const hasB=MARK_BUILTIN&&!real&&builtins.some(b=>b.family===f.id);
+      const t=el('button',{class:'toggle','aria-pressed':String(settings.families[f.id]!==false)},[f.label,...(hasB?[el('span',{class:'rec recb',title:'Enregistrement intégré',text:' ●'})]:[]),...(real?[el('span',{class:'rec',title:mixed?'Enregistrement importé, mélangé au son synthétique':'Enregistrement importé',text:mixed?' ◐':' ●'})]:[])]);
+      const box=el('div',{class:'fam'+(real?' real':'')});
+      // appui long (tactile) : affiche le bouton Remplacer sans basculer la famille
+      let lp=null,longDone=false;
+      t.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')return;longDone=false;clearTimeout(lp);lp=setTimeout(()=>{longDone=true;document.querySelectorAll('.fam.showrep').forEach(x=>x!==box&&x.classList.remove('showrep'));box.classList.add('showrep');},500);});
+      for(const ev of ['pointerup','pointerleave','pointercancel'])t.addEventListener(ev,()=>clearTimeout(lp));
+      t.addEventListener('contextmenu',e=>e.preventDefault());
+      t.addEventListener('click',e=>{if(longDone){longDone=false;e.preventDefault();return;}settings.families[f.id]=settings.families[f.id]===false;saveSettings();t.setAttribute('aria-pressed',String(settings.families[f.id]));updateSummaries();});
+      const r=el('button',{class:'rep',text:'⇄','aria-label':'Remplacer le son : '+f.label,title:'Remplacer ce son',onclick:()=>openRepSheet(sheet,f,box)});
+      box.append(t,el('button',{class:'play',text:'▶','aria-label':'Écouter : '+f.label,onclick:()=>preview(f)}),r);
+      wrap.append(box);
     }
-    const grp=el('div',{class:'group'},[head,wrap]);
-    if(g.id==='voix')grp.append(el('p',{class:'hint',text:'Jouées seulement pendant un EV cacophonie. Importe de vraies voix dans ces catégories : elles joueront à tout moment, à la place des voix synthétiques.'}));
+    const grp=el('div',{class:'group'},[head,wrap,sheet]);
+    if(g.id==='voix')grp.append(el('p',{class:'hint',text:'Ce sont de vrais enregistrements : ils jouent à tout moment, comme les autres sons. Décoche ceux que tu ne veux pas entendre pendant la détente.'}));
     box.append(grp);
   }
 }
+/* remplacer le son d'une famille par un ou plusieurs enregistrements */
+let repTarget=null;
+function openRepSheet(sheet,f,box){
+  document.querySelectorAll('.repsheet').forEach(x=>{if(x!==sheet)x.hidden=true;});
+  const real=samples.filter(x=>x.family===f.id);
+  sheet.innerHTML='';sheet.hidden=false;
+  sheet.append(
+    el('p',{},[el('b',{text:f.label}),document.createTextNode(!real.length&&builtins.some(b=>b.family===f.id)?' · enregistrement d\'origine':real.length?` · ${real.length} enregistrement${real.length>1?'s':''} importé${real.length>1?'s':''} (${real.map(x=>x.name).join(', ')})${settings.mixSynth[f.id]&&!f.noSynth?', mélangé au son d\'origine':''}`:(f.noSynth?' · aucun son':' · son synthétique'))]),
+    el('p',{class:'hint',text:real.length?'Choisir un fichier remplace les enregistrements actuels de cette catégorie. Tu peux en choisir plusieurs : ils seront tirés au hasard.':'Choisis un ou plusieurs fichiers (MP3, WAV, OGG, M4A, 8 Mo max). Ils remplaceront le son synthétique et seront tirés au hasard.'}),
+    ...((real.length||builtins.some(b=>b.family===f.id))&&!f.noSynth&&Synth[f.id]?[(()=>{const cb=el('input',{type:'checkbox'});cb.checked=!!settings.mixSynth[f.id];
+      cb.addEventListener('change',()=>{if(cb.checked)settings.mixSynth[f.id]=true;else delete settings.mixSynth[f.id];saveSettings();renderGroups();const nb=[...document.querySelectorAll('#groups button.rep')].find(b=>b.getAttribute('aria-label')==='Remplacer le son : '+f.label);if(nb)nb.click();});
+      return el('label',{class:'check'},[cb,el('span',{},['Mélanger avec le son synthétique',el('small',{text:'Enregistrement et son synthétique tirés au hasard, une fois sur deux chacun. Décoché : seuls les enregistrements sont joués.'})])]);})()]:[]),
+    el('div',{class:'row'},[
+      el('button',{class:'primary',text:real.length?'Remplacer par…':'Choisir un fichier…',onclick:()=>{repTarget=f;$('#repFile').click();}}),
+      el('button',{text:'Écouter',onclick:()=>preview(f)}),
+      ...(real.length?[el('button',{class:'danger',text:f.noSynth?'Supprimer':'Rétablir le son d\'origine',onclick:()=>restoreFamily(f)})]:[]),
+      el('button',{text:'Fermer',onclick:()=>{sheet.hidden=true;box.classList.remove('showrep');}})
+    ]));
+  sheet.scrollIntoView({block:'nearest',behavior:reduced?'auto':'smooth'});
+}
+async function restoreFamily(f){
+  for(const x of samples.filter(x=>x.family===f.id)){try{await SampleDB.del(x.id);}catch(e){}}
+  samples=samples.filter(x=>x.family!==f.id);saveSettings();renderSamples();renderGroups();
+  showMsg(f.noSynth?`${f.label} : enregistrements supprimés.`:`${f.label} : son d'origine rétabli.`);
+}
+$('#repFile').addEventListener('change',async ev=>{
+  const files=[...ev.target.files];ev.target.value='';const f=repTarget;repTarget=null;if(!f||!files.length)return;
+  const ok=files.filter(x=>x.size<=8*1024*1024);if(ok.length<files.length)showMsg('Fichier de plus de 8 Mo ignoré.');if(!ok.length)return;
+  const fresh=[];
+  for(const file of ok){
+    const rec={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),name:file.name.replace(/\.[^.]+$/,''),family:f.id,data:await file.arrayBuffer()};
+    if(engine.ctx){try{await engine.ctx.decodeAudioData(rec.data.slice(0));}catch(e){showMsg(`${file.name} : format audio non reconnu.`);continue;}}
+    fresh.push(rec);
+  }
+  if(!fresh.length)return;
+  for(const x of samples.filter(x=>x.family===f.id)){try{await SampleDB.del(x.id);}catch(e){}}
+  samples=samples.filter(x=>x.family!==f.id);
+  for(const rec of fresh){try{await SampleDB.put(rec);samples.push(rec);}catch(e){showMsg('Import impossible : '+e.message);}}
+  if(engine.ctx)await decodeSamples();
+  keepStorage();renderSamples();renderGroups();showMsg(`${f.label} remplacé par ${fresh.length>1?fresh.length+' enregistrements':'« '+fresh[0].name+' »'}.`);
+});
 async function preview(f){
   try{await engine.init(settings.background&&!window.VibrostaseNative,settings.light);}catch(e){return showMsg(e.message);}
   await decodeSamples();
   if(!session){engine.master.gain.cancelScheduledValues(engine.ctx.currentTime);engine.master.gain.setValueAtTime(1,engine.ctx.currentTime);}
   engine.setVolume(settings.volume);engine.setOutput(settings.output);
   const r=new Rng(newSeed());
-  const res=playFamily(engine,f,engine.ctx.currentTime+0.08,{pan:r.range(-0.6,0.6),distance:0.4,gain:settings.eventLevel*0.9},r,samples);
+  const res=playFamily(engine,f,engine.ctx.currentTime+0.08,{pan:r.range(-0.6,0.6),distance:0.4,gain:settings.eventLevel*0.9},r,effSamples());
   if(!res)showMsg('Aucun son importé dans cette catégorie.');
 }
 function showMsg(t){const m=$('#msg');m.textContent=t;m.hidden=!t;if(t)setTimeout(()=>{if(m.textContent===t)m.hidden=true;},6000);}
@@ -2411,12 +2563,15 @@ function initSampleUi(){
       try{await SampleDB.put(rec);samples.push(rec);}catch(e){showMsg('Import impossible : '+e.message);}
     }
     if(engine.ctx)await decodeSamples();
-    renderSamples();renderGroups();
+    keepStorage();renderSamples();renderGroups();
   });
 }
-async function loadSamples(){try{samples=await SampleDB.all();}catch(e){samples=[];$('#sampleHint').textContent=e.message;}renderSamples();renderGroups();}
+// demande au navigateur de ne jamais effacer de lui-même les sons importés (sinon il peut le faire s'il manque de place)
+async function keepStorage(){try{if(samples.length&&navigator.storage&&navigator.storage.persist&&!(await navigator.storage.persisted()))await navigator.storage.persist();}catch(e){}}
+async function loadSamples(){try{samples=await SampleDB.all();}catch(e){samples=[];$('#sampleHint').textContent=e.message;}renderSamples();renderGroups();keepStorage();}
 async function decodeSamples(){
   if(!engine.ctx)return;
+  await loadBuiltins();
   for(const s of samples){if(!s.buffer&&!s.bad){try{s.buffer=await engine.ctx.decodeAudioData(s.data.slice(0));}catch(e){s.bad=true;}}}
   renderSamples();
 }
@@ -2475,7 +2630,7 @@ async function startSessionInner(){
   if(settings.hr.source==='ble'&&!hr.connected)showMsg('Montre non connectée : la séance démarre sans cardio.');
   engine.watchInterruptions(st=>{const b=$('#runBuf');if(!session)return;if(st==='running'){b.dataset.int='';return;}
     b.hidden=false;b.dataset.int='1';b.textContent='Son interrompu par le téléphone. Touche l\'écran pour reprendre.';});
-  session=new Session({engine,hr,samples,settings:clone(settings),
+  session=new Session({engine,hr,samples:effSamples(),settings:clone(settings),
     onEvent:ev=>{if(!reduced||rings.length<20)rings.push({t0:performance.now(),pan:ev.pan,d:ev.distance,y:0.15+Math.random()*0.7});if(settings.showEvents)$('#runEv').textContent=ev.label;},
     onTick:uiTick,onEnd,onError:err=>showMsg('Erreur de calcul du son : '+(err&&err.message||err))});
   const trk=!!settings.track.enabled;
@@ -2518,6 +2673,8 @@ function onEnd(rec){
   releaseWake();setTimeout(()=>{if(!session&&window.VibrostaseNative)try{window.VibrostaseNative.sessionState(false,false);}catch(e){}},wait);cancelAnimationFrame(rafId);
   trackStop(rec);
   lastRecord=rec;saveHistory(h=>{h.unshift(rec);return h;});
+  if(anUseful(rec)){const p=anProfile();p.n=(p.n|0)+1;anSave(p);}
+  if(rec._raw||rec._events)SampleDB.aPut({id:rec.id,raw:rec._raw||null,events:rec._events||[],hrSeries:rec.hr&&rec.hr.series||null}).catch(()=>{});
   session=null;$('#black').hidden=true;
   showSummary(rec,true);renderHistory();
 }
@@ -2647,7 +2804,7 @@ function renderHistory(){
   for(const id of [...cmpSel])if(!hist.some(r=>r.id===id))cmpSel.delete(id);updateCmpRow();
   const noted=hist.filter(r=>(r.marks||[]).some(m=>m.k==='ev'||m.k==='sortie')).length;
   $('#jCount').textContent=hist.length?`${hist.length} séance${hist.length>1?'s':''}${noted?` · ${noted} avec EV ou sortie notés`:''}`:'';
-  $('#btnCmpMode').hidden=hist.filter(r=>r.track).length<2;$('#btnCmpMode').setAttribute('aria-pressed',String(cmpMode));$('#btnCmpMode').textContent=cmpMode?'Terminer':'Comparer';
+  $('#btnCmpMode').hidden=!hist.length;$('#btnCmpMode').setAttribute('aria-pressed',String(cmpMode));$('#btnCmpMode').textContent=cmpMode?'Terminer':'Sélectionner';
   if(!hist.length){ul.append(el('li',{class:'empty',text:'Aucune séance pour l\'instant. Lance-en une depuis l\'onglet Séance.'}));return;}
   for(const r of hist){
     const d=new Date(r.startedAt),kids=[];
@@ -2659,8 +2816,8 @@ function renderHistory(){
     }
     const bd=recBadges(r);if(bd.length)kids.push(el('div',{class:'badges'},bd.map(x=>el('span',{class:'badge'+(x[1]?' w':''),text:x[0]}))));
     let li;
-    if(cmpMode&&r.track){const cb=el('input',{type:'checkbox','aria-label':'Comparer cette séance'});cb.checked=cmpSel.has(r.id);
-      cb.addEventListener('change',()=>{if(cb.checked){if(cmpSel.size>=3){cb.checked=false;return showMsg('3 séances au plus.');}cmpSel.add(r.id);}else cmpSel.delete(r.id);updateCmpRow();});
+    if(cmpMode){const cb=el('input',{type:'checkbox','aria-label':'Sélectionner cette séance'});cb.checked=cmpSel.has(r.id);
+      cb.addEventListener('change',()=>{if(cb.checked)cmpSel.add(r.id);else cmpSel.delete(r.id);updateCmpRow();});
       li=el('li',{},[el('label',{class:'hcard sel'},[cb,el('div',{},kids)])]);}
     else li=el('li',{},[el('button',{class:'hcard',type:'button',onclick:()=>showSummary(r,false)},kids)]);
     ul.append(li);
@@ -2668,8 +2825,10 @@ function renderHistory(){
 }
 $('#btnCmpMode').addEventListener('click',()=>{cmpMode=!cmpMode;if(!cmpMode)cmpSel.clear();renderHistory();});
 // si le stockage est plein, on retire les séances les plus anciennes jusqu'à ce que ça passe
+const HIST_MAX=366; // une séance par jour pendant un an, plus un jour
 function saveHistory(fn){
-  let h=fn(Store.get('history',[])||[]).slice(0,40);
+  let h=fn(Store.get('history',[])||[]).slice(0,HIST_MAX);
+  if(!h.length){Store.set('history',[]);return;}
   while(h.length&&!Store.set('history',h))h=h.slice(0,Math.max(0,h.length-5));
 }
 async function copyText(t){
@@ -2750,6 +2909,7 @@ function trackStop(rec){
   if(tracker&&rec){
     // dernières mesures avant de figer
     try{const d=PhoneSensors.poll();tracker.update(rec.actualSec,d,null,'silence');}catch(e){}
+    try{Object.defineProperty(rec,'_raw',{value:tracker.exportRaw(rec.actualSec),enumerable:false});}catch(e){}
     rec.track=tracker.export();rec.track.st=rec.track.st.slice(0,Math.floor(rec.actualSec/TRACK_DT));
     for(const k of ['hr','bk','br'])rec.track[k]=rec.track[k].slice(0,rec.track.st.length);
     rec.marks=[];
@@ -2796,7 +2956,7 @@ function drawSumGraph(){
   }
 }
 function showSummary(r,fresh){
-  viewRec=r;lastRecord=r;r.__back=fresh?'setup':'journal';markCursor=null;
+  viewRec=r;lastRecord=r;r.__back=fresh?'setup':'journal';markCursor=null;delRecArm=0;$('#btnDelRec').textContent='Supprimer cette séance';
   const d=new Date(r.startedAt);
   $('#sumTitle').textContent=fresh?'Séance terminée':recLabel(r);
   $('#sumSub').textContent=`${fresh?recLabel(r)+' · ':''}${d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · ${fmtTime(r.actualSec)}`;
@@ -2806,6 +2966,8 @@ function showSummary(r,fresh){
   const has=!!(r.track&&r.track.st&&r.track.st.length);$('#sumGraphBox').hidden=!has;
   go('summary');
   if(has){legendFor($('#sumLegend'),r);requestAnimationFrame(drawSumGraph);}
+  $('#markNudge').hidden=!has||!!(r.marks&&r.marks.length);
+  renderAnBox(fresh);
 }
 let markCursor=null;
 function renderSumCards(r){
@@ -2826,6 +2988,7 @@ function renderMarkBar(){
 function saveMarks(){
   const r=viewRec;if(!r)return;
   saveHistory(h=>{const k=h.findIndex(x=>x.id===r.id);if(k>=0)h[k].marks=r.marks;return h;});
+  $('#markNudge').hidden=!!(r.marks&&r.marks.length);
   $('#sumText').textContent=summaryText(r);drawSumGraph();renderSumCards(r);renderMarkBar();
 }
 function openMarkSheet(t){
@@ -2890,9 +3053,36 @@ async function exportPng(){
 }
 $('#btnPng').addEventListener('click',exportPng);
 $('#btnReplay').addEventListener('click',()=>{if(viewRec)replayRec(viewRec);});
+let delRecArm=0;
+$('#btnDelRec').addEventListener('click',()=>{
+  if(!viewRec)return;const b=$('#btnDelRec'),now=performance.now();
+  if(!delRecArm||now-delRecArm>4000){delRecArm=now;b.textContent='Confirmer la suppression';setTimeout(()=>{if(delRecArm&&performance.now()-delRecArm>=4000){delRecArm=0;b.textContent='Supprimer cette séance';}},4100);return;}
+  delRecArm=0;b.textContent='Supprimer cette séance';const back=viewRec.__back==='setup'?'setup':'journal';
+  deleteRecords([viewRec.id]);viewRec=null;go(back);showMsg('Séance supprimée.');
+});
 /* superposition */
 const cmpSel=new Set();
-function updateCmpRow(){const n=cmpSel.size;$('#cmpRow').hidden=!cmpMode;$('#btnCmp').disabled=n<2;$('#btnCmp').textContent=n>=2?`Superposer (${n})`:'Superposer';$('#cmpHint').textContent=n<2?'Coche au moins 2 séances (3 au plus).':'';}
+let delArm=0;
+function updateCmpRow(){
+  const n=cmpSel.size,hist=Store.get('history',[])||[],withTrack=hist.filter(r=>cmpSel.has(r.id)&&r.track).length;
+  $('#cmpRow').hidden=!cmpMode;delArm=0;
+  const okCmp=withTrack>=2&&withTrack<=3&&withTrack===n;
+  $('#btnCmp').disabled=!okCmp;$('#btnCmp').textContent='Superposer';
+  $('#btnDelSel').disabled=!n;$('#btnDelSel').textContent=n?`Supprimer (${n})`:'Supprimer';
+  $('#btnSelAll').textContent=n&&n===hist.length?'Tout décocher':'Tout cocher';
+  $('#cmpHint').textContent=!n?'Coche des séances pour les supprimer, ou 2 à 3 séances avec graphique pour les superposer.':n>3?'Superposer : 3 séances au plus.':(n>=2&&withTrack<n)?'Superposer : seulement des séances avec graphique.':'';
+}
+function deleteRecords(ids){
+  const set=new Set(ids);saveHistory(h=>h.filter(r=>!set.has(r.id)));SampleDB.aDel([...set]).catch(()=>{});
+  for(const id of set)cmpSel.delete(id);
+  if(lastRecord&&set.has(lastRecord.id))lastRecord=null;
+}
+$('#btnSelAll').addEventListener('click',()=>{const hist=Store.get('history',[])||[];if(cmpSel.size===hist.length)cmpSel.clear();else hist.forEach(r=>cmpSel.add(r.id));renderHistory();});
+$('#btnDelSel').addEventListener('click',()=>{
+  const n=cmpSel.size;if(!n)return;const b=$('#btnDelSel'),now=performance.now();
+  if(!delArm||now-delArm>4000){delArm=now;b.textContent=`Confirmer la suppression (${n})`;$('#cmpHint').textContent='Touche encore pour supprimer définitivement. Pense à exporter une sauvegarde avant.';return;}
+  deleteRecords([...cmpSel]);cmpMode=false;cmpSel.clear();renderHistory();showMsg(`${n} séance${n>1?'s':''} supprimée${n>1?'s':''}.`);
+});
 $('#btnCmp').addEventListener('click',()=>{
   const hist=Store.get('history',[])||[],recs=hist.filter(r=>cmpSel.has(r.id)).slice(0,3);if(recs.length<2)return;
   go('compare');
@@ -3071,10 +3261,10 @@ $('#runStage').addEventListener('click',()=>{if($('#runCtl').hidden)showRunCtl()
 $('#runCtl').addEventListener('pointerdown',()=>showRunCtl());$('#runCtl').addEventListener('input',()=>showRunCtl());
 let stopHold=null;
 const stopBtn=$('#btnStop'),HOLD=1200;
-function holdStart(e){if(prep){prep.cancel();return;}if(!session)return;e.preventDefault();stopBtn.classList.add('holding');stopHold=setTimeout(()=>{stopHold=null;stopBtn.classList.remove('holding');if(session)session.stop(false);},HOLD);}
+function holdStart(e){if(prep){prep.cancel();return;}if(!session)return;e.preventDefault();try{stopBtn.setPointerCapture(e.pointerId);}catch(x){}stopBtn.classList.add('holding');stopHold=setTimeout(()=>{stopHold=null;stopBtn.classList.remove('holding');if(session)session.stop(false);},HOLD);}
 function holdEnd(){if(stopHold){clearTimeout(stopHold);stopHold=null;stopBtn.classList.remove('holding');showMsgRun('Maintiens le bouton appuyé pour arrêter.');}}
 stopBtn.addEventListener('pointerdown',holdStart);stopBtn.addEventListener('pointerup',holdEnd);stopBtn.addEventListener('pointerleave',holdEnd);stopBtn.addEventListener('pointercancel',holdEnd);
-stopBtn.addEventListener('contextmenu',e=>e.preventDefault());
+stopBtn.addEventListener('contextmenu',e=>e.preventDefault());stopBtn.addEventListener('selectstart',e=>e.preventDefault());
 // clavier : Entrée deux fois de suite arrête
 stopBtn.addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;e.preventDefault();const n=performance.now();if(n-(stopBtn.k||0)<1500){if(session)session.stop(false);}else{stopBtn.k=n;showMsgRun('Appuie une seconde fois pour arrêter.');}});
 function showMsgRun(t){const b=$('#runBuf');b.hidden=false;b.dataset.int='';b.dataset.msg='1';b.textContent=t;clearTimeout(showMsgRun.t);showMsgRun.t=setTimeout(()=>{b.dataset.msg='';},3000);}
@@ -3118,7 +3308,7 @@ async function exportBackup(){
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const name=`vibrostase-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
   const r=await saveFile(name,blob);
-  msg.textContent=r==='saved'?`Sauvegarde prête (${(blob.size/1048576).toFixed(1)} Mo)${window.VibrostaseNative?', dans le dossier Téléchargements':''}.`:r==='declined'?'Enregistrement annulé.':'Téléchargement impossible ici.';
+  msg.textContent=r==='saved'?`Sauvegarde prête (${fmtSize(blob.size)})${window.VibrostaseNative?', dans le dossier Téléchargements':''}.`:r==='declined'?'Enregistrement annulé.':'Téléchargement impossible ici.';
 }
 async function importBackup(file){
   const msg=$('#bkMsg');
@@ -3148,6 +3338,137 @@ async function importBackup(file){
   msg.textContent=`Restauration faite : réglages et modèles repris, ${addedH} séance${addedH>1?'s':''} et ${addedS} son${addedS>1?'s':''} ajouté${addedS>1?'s':''}${badS?`, ${badS} son${badS>1?'s':''} illisible${badS>1?'s':''}`:''}.`;
 }
 $('#btnExport').addEventListener('click',exportBackup);
+
+/* export d'analyse */
+const APP_VERSION='v27';
+function anProfile(){
+  const p=Store.get('analysis',null)||{};
+  if(typeof p.pid!=='string'||!/^[a-z0-9]{10}$/.test(p.pid)){const a=new Uint8Array(10);crypto.getRandomValues(a);p.pid=Array.from(a,x=>'abcdefghijkmnpqrstuvwxyz23456789'[x%32]).join('');}
+  if(!Array.isArray(p.done))p.done=[];
+  return p;
+}
+function anSave(p){Store.set('analysis',p);}
+// séances exclues de l'analyse : moins de 2 minutes, ou cœur simulé
+const anUseful=r=>(r.actualSec|0)>=120&&!(r.hr&&r.hr.source==='sim')&&!(r.settings&&r.settings.hr&&r.settings.hr.source==='sim');
+const fmtSize=b=>b<1048576?Math.max(1,Math.round(b/1024))+' Ko':(b/1048576).toFixed(1)+' Mo';
+// adresse du script de réception (Google Apps Script). Vide : envoi automatique indisponible, export manuel seulement.
+const ANALYSIS_ENDPOINT='https://script.google.com/macros/s/AKfycbzJeeRSS2R3G-km75KdY26X1IGEitQgImsGuazQUfr4Dqcxt0xFzKRVeYEvMrNkHRqA/exec',ANALYSIS_KEY='vbs-ana-1',AN_MANUAL=10,AN_BATCH=10;
+// dans claude.ai la page ne peut joindre aucun site extérieur : export manuel seulement
+const anAutoPossible=()=>!window.claude&&/^https:\/\/script\.google\.com\//.test(ANALYSIS_ENDPOINT);
+const AN_INFO="Ces données servent uniquement à rendre la détection plus précise : EV, détente, endormissement, réveils, réactions aux sons. Elles sont anonymes : un identifiant tiré au hasard, rien sur toi, rien de ce qui se passe hors des séances. Contenu : mouvements du téléphone, cœur, respiration, volume sonore (jamais d'enregistrement du micro), déroulé, repères notés, date et heure de chaque séance, et ton profil court. Elles sont reçues par le créateur de Vibrostase et supprimées sur simple demande avec ton identifiant.";
+// envoi au script : texte brut pour éviter la requête préalable CORS ; si la réponse est illisible, on la tient pour reçue
+async function anPost(data){
+  const body=JSON.stringify(Object.assign({key:ANALYSIS_KEY},data));
+  try{const r=await fetch(ANALYSIS_ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body,redirect:'follow'});
+    const j=await r.json().catch(()=>null);return !!(j&&j.ok);}
+  catch(e){try{await fetch(ANALYSIS_ENDPOINT,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain;charset=utf-8'},body});return true;}catch(e2){return false;}}
+}
+let anSending=false;
+async function anAutoSend(){
+  const p=anProfile();if(p.consent!=='auto'||!anAutoPossible()||anSending)return;
+  const done=new Set(p.done),todo=(Store.get('history',[])||[]).filter(r=>anUseful(r)&&!done.has(r.id));
+  if(todo.length<AN_BATCH)return;
+  anSending=true;
+  try{const {data,ids}=await buildAnalysis(todo,true);if(await anPost(data))anMarkDone(ids);}catch(e){}
+  anSending=false;
+}
+function renderAnBox(fresh){
+  const box=$('#anBox'),p=anProfile(),row=$('#anBoxRow');row.innerHTML='';$('#anBoxMsg').textContent='';box.hidden=true;
+  if(!fresh||p.consent==='no')return;
+  const n=p.n|0,todo=(Store.get('history',[])||[]).filter(r=>anUseful(r)&&!new Set(p.done).has(r.id)).length;
+  if(n>=AN_MANUAL&&!p.asked&&anAutoPossible()){
+    // accord final après les 10 premières séances
+    box.hidden=false;$('#anBoxT').textContent='Envoi automatique des données';
+    $('#anBoxInfo').textContent=`Tes ${AN_MANUAL} premières séances sont passées. Avec ton accord, les mêmes données seront envoyées automatiquement toutes les ${AN_BATCH} séances, sans que tu aies à exporter. ${AN_INFO} Tu pourras arrêter à tout moment dans Réglages, Données d'analyse.`;
+    row.append(el('button',{class:'primary',text:'J\'accepte l\'envoi automatique',onclick:()=>{const q=anProfile();q.asked=true;q.consent='auto';anSave(q);$('#anBoxMsg').textContent='C\'est noté. Merci.';row.innerHTML='';renderAnalysis();anAutoSend();}}),
+      el('button',{text:'Non, je reste en manuel',onclick:()=>{const q=anProfile();q.asked=true;q.consent='manual';anSave(q);box.hidden=true;renderAnalysis();}}));
+    return;
+  }
+  if(p.consent==='auto'){if(todo>=AN_BATCH)anAutoSend();return;}
+  if(!todo)return; // rien d'utile (séances trop courtes ou cœur simulé)
+  if(n>AN_MANUAL&&p.asked)return; // resté en manuel : la page Données d'analyse suffit
+  box.hidden=false;$('#anBoxT').textContent=`Aider à améliorer la détection · séance ${Math.min(n,AN_MANUAL)}/${AN_MANUAL}`;
+  $('#anBoxInfo').textContent=`${AN_INFO} Pendant tes ${AN_MANUAL} premières séances, l'export se fait à la main pour que tu voies ce qui part.${anAutoPossible()?` Ensuite, un accord te sera demandé pour un envoi automatique toutes les ${AN_BATCH} séances.`:''}`;
+  row.append(el('button',{class:'primary',text:`Exporter ${todo>1?`mes ${todo} séances`:'cette séance'}`,onclick:async()=>{
+      const m=$('#anBoxMsg');m.textContent='Préparation…';const {data,ids,name}=await buildAnalysis(null,true);
+      const blob=new Blob([JSON.stringify(data)],{type:'application/json'}),r=await saveFile(name,blob);
+      if(r==='saved'){anMarkDone(ids);const q=anProfile();if(!q.consent)q.consent='manual';anSave(q);m.textContent=`Fichier prêt (${fmtSize(blob.size)})${window.VibrostaseNative?', dans le dossier Téléchargements':''}. Envoie-le à la personne qui t'a partagé l'appli.`;}
+      else m.textContent=r==='declined'?'Enregistrement annulé.':'Téléchargement impossible ici.';}}),
+    el('button',{text:'Ne plus proposer',onclick:()=>{const q=anProfile();q.consent='no';anSave(q);box.hidden=true;}}));
+}
+function anDevice(){
+  const ua=navigator.userAgent||'';
+  return {platform:window.VibrostaseNative?'android-app':/iPhone|iPad|iPod/.test(ua)?'ios':/Android/.test(ua)?'android-web':'desktop',
+    browser:/Firefox\//.test(ua)?'firefox':/Edg\//.test(ua)?'edge':/Chrome\//.test(ua)?'chrome':/Safari\//.test(ua)?'safari':'other',
+    embedded:!!window.claude,sensors:!!(window.VibrostaseNative&&window.VibrostaseNative.sensorsPoll)};
+}
+function anTodo(){
+  const p=anProfile(),done=new Set(p.done),hist=Store.get('history',[])||[];
+  return hist.filter(r=>anUseful(r)&&(!$('#anNew').checked||!done.has(r.id)));
+}
+function renderAnalysis(){
+  const p=anProfile();anSave(p);
+  for(const s of document.querySelectorAll('[data-an]'))s.value=p[s.dataset.an]||'';
+  $('#anNotes').checked=!p.noNotes;
+  if(p.consent==='auto'||p.consent==='manual')$('#anOk').checked=true;
+  $('#anPid').textContent=p.pid;
+  const hist=Store.get('history',[])||[],todo=anTodo(),n=todo.length,withG=todo.filter(r=>r.track).length;
+  const skip=hist.filter(r=>!anUseful(r)).length;
+  $('#anCount').textContent=hist.length?`${n} séance${n>1?'s':''} à exporter, dont ${withG} avec graphique.${skip?` ${skip} écartée${skip>1?'s':''} : moins de 2 minutes ou cœur simulé.`:''}`:'Aucune séance pour l\'instant.';
+  $('#btnAnExport').disabled=!$('#anOk').checked||!n;$('#btnAnShare').disabled=$('#btnAnExport').disabled;
+  $('#anAutoRow').hidden=!anAutoPossible();$('#btnAnSend').hidden=!anAutoPossible()||!$('#anOk').checked;$('#btnAnSend').disabled=!n;$('#anAuto').checked=p.consent==='auto';
+  $('#anAutoInfo').textContent=p.consent==='auto'?`Actif : prochain envoi dans ${Math.max(0,AN_BATCH-(hist.length-hist.filter(r=>new Set(p.done).has(r.id)).length))} séance(s). Décoche pour arrêter.`:`Les mêmes données, envoyées sans rien faire toutes les ${AN_BATCH} séances. Décoche pour arrêter à tout moment.`;
+  $('#sumAna').textContent=p.done.length?`${p.done.length} séance${p.done.length>1?'s':''} déjà exportée${p.done.length>1?'s':''}`:'Contribuer';
+}
+async function buildAnalysis(list,fromCard){
+  const p=anProfile(),notes=$('#anNotes').checked;
+  const todo=list||(fromCard?(Store.get('history',[])||[]).filter(r=>anUseful(r)&&!new Set(p.done).has(r.id)):anTodo());
+  let keys=[];try{keys=new Set(await SampleDB.aKeys());}catch(e){keys=new Set();}
+  const sessions=[];
+  for(const r of todo){
+    const x=clone(r);if(!notes)delete x.note;
+    // sons importés : on garde la catégorie, jamais le nom du fichier
+    let a=null;if(keys.has(r.id)){try{a=await SampleDB.aGet(r.id);}catch(e){}}
+    if(a){x.raw=a.raw||null;x.events=a.events||[];}
+    sessions.push(x);
+  }
+  const data={app:'vibrostase-analyse',format:1,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),tzOffsetMin:-new Date().getTimezoneOffset(),
+    participant:p.pid,profile:{shc:p.shc||null,evf:p.evf||null,age:p.age||null,watch:p.watch||null},device:anDevice(),
+    legend:{st:ST,blocks:BLOCKS,marks:MARKS,trackDt:TRACK_DT,units:{mv:'mouvement RMS ×1000 (m/s², au-dessus de ~0,6 Hz)',pk:'pic de mouvement ×1000',nz:'volume micro dB (max par seconde)',hr:'bpm',br:'bande lente de l\'accéléromètre ×10000, 2 Hz',diag:'toutes les 5 s : immobilité (s), respiration (/min, variabilité), baisse et saut cardio (bpm), activation, seuil de mouvement ×1000, fond sonore dB'}},
+    sessions};
+  return {data,ids:todo.map(r=>r.id),name:`vibrostase-analyse-${p.pid}-${new Date().toISOString().slice(0,10)}.json`};
+}
+function anMarkDone(ids){const p=anProfile();p.done=[...new Set(p.done.concat(ids))].slice(-2000);p.lastExport=new Date().toISOString();anSave(p);renderAnalysis();}
+$('#btnAnExport').addEventListener('click',async()=>{
+  const msg=$('#anMsg');msg.textContent='Préparation…';
+  const {data,ids,name}=await buildAnalysis();
+  const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
+  const r=await saveFile(name,blob);
+  if(r==='saved'){anMarkDone(ids);msg.textContent=`Fichier prêt : ${ids.length} séance${ids.length>1?'s':''}, ${fmtSize(blob.size)}${window.VibrostaseNative?', dans le dossier Téléchargements':''}.`;}
+  else msg.textContent=r==='declined'?'Enregistrement annulé.':'Téléchargement impossible ici.';
+});
+// partage direct (messagerie, mail…) quand le navigateur le permet
+try{if(!window.claude&&navigator.canShare&&navigator.canShare({files:[new File(['{}'],'t.json',{type:'application/json'})]}))$('#btnAnShare').hidden=false;}catch(e){}
+$('#btnAnShare').addEventListener('click',async()=>{
+  const msg=$('#anMsg');
+  const {data,ids,name}=await buildAnalysis();
+  const f=new File([JSON.stringify(data)],name,{type:'application/json'});
+  try{await navigator.share({files:[f],title:'Données Vibrostase'});anMarkDone(ids);msg.textContent='Partagé.';}catch(e){msg.textContent=e&&e.name==='AbortError'?'Partage annulé.':'Partage impossible ici : utilise « Exporter ».';}
+});
+for(const s of document.querySelectorAll('[data-an]'))s.addEventListener('change',()=>{const p=anProfile();p[s.dataset.an]=s.value||undefined;anSave(p);});
+$('#btnAnSend').addEventListener('click',async()=>{
+  const m=$('#anMsg');m.textContent='Envoi…';
+  const {data,ids}=await buildAnalysis();
+  const ok=await anPost(data);
+  if(ok){anMarkDone(ids);m.textContent=`Envoyé : ${ids.length} séance${ids.length>1?'s':''}.`;}else m.textContent='Envoi impossible depuis cette page (connexion ou blocage). Utilise « Exporter mes données ».';
+});
+for(const id of ['#anNew','#anOk'])$(id).addEventListener('change',renderAnalysis);
+$('#anNotes').addEventListener('change',()=>{const p=anProfile();p.noNotes=!$('#anNotes').checked;anSave(p);});
+$('#anAuto').addEventListener('change',()=>{const p=anProfile();p.asked=true;p.consent=$('#anAuto').checked?'auto':'manual';anSave(p);renderAnalysis();if(p.consent==='auto')anAutoSend();});
+document.querySelector('[data-open="analysis"]').addEventListener('click',renderAnalysis);
+renderAnalysis();
+// mesures orphelines (séances supprimées ou sorties de l'historique) : on fait le ménage
+SampleDB.aKeys().then(k=>{const ids=new Set((Store.get('history',[])||[]).map(r=>r.id)),old=k.filter(x=>!ids.has(x));if(old.length)SampleDB.aDel(old);}).catch(()=>{});
 $('#btnImportBk').addEventListener('click',()=>$('#bkFile').click());
 $('#bkFile').addEventListener('change',ev=>{const f=ev.target.files[0];ev.target.value='';if(f)importBackup(f);});
 

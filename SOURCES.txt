@@ -1,0 +1,106 @@
+Sons intégrés à Vibrostase
+
+Lot 0 : fournis par l'utilisateur (Freesound).
+  battements-de-coeur-1 (heartbeat)
+  gresillement-1 (crackle)
+  sifflement-1 (whistle)
+  neige-de-tele-1 (static)
+  souffle-1 (breath)
+  arc-electrique-1 (zap)
+  moustique-1 (mosquito)
+
+Lots 1 à 4 : Freesound, licence CC0 (domaine public), aperçus haute qualité, convertis en MP3 mono 96 kb/s, volume harmonisé (-20 LUFS ; -30 pour l'acouphène ; -17 pour le tambour), extrait de 20 s au plus. Voix en français (lot 3).
+  train-vapeur-1 (steamtrain) : https://freesound.org/s/387871/
+  train-vapeur-2 (steamtrain) : https://freesound.org/s/619241/
+  petard-1 (firecracker) : https://freesound.org/s/140711/
+  petard-2 (firecracker) : https://freesound.org/s/263536/
+  petard-3 (firecracker) : https://freesound.org/s/455770/
+  claquement-1 (clap) : https://freesound.org/s/529925/
+  claquement-2 (clap) : https://freesound.org/s/319231/
+  claquement-3 (clap) : https://freesound.org/s/615761/
+  chien-1 (bark) : https://freesound.org/s/485961/
+  chien-2 (bark) : https://freesound.org/s/440865/
+  chat-1 (meow) : https://freesound.org/s/110011/
+  chat-2 (meow) : https://freesound.org/s/412017/
+  rires-1 (laugh) : https://freesound.org/s/108928/
+  rires-2 (laugh) : https://freesound.org/s/269461/
+  choeur-1 (choir) : https://freesound.org/s/150413/
+  choeur-2 (choir) : https://freesound.org/s/449579/
+  acouphene-1 (tinnitus) : https://freesound.org/s/377205/
+  acouphene-2 (tinnitus) : https://freesound.org/s/455304/
+  pas-1 (steps) : https://freesound.org/s/119914/
+  pas-2 (steps) : https://freesound.org/s/367050/
+  toc-toc-1 (knock) : https://freesound.org/s/268500/
+  toc-toc-2 (knock) : https://freesound.org/s/621234/
+  porte-grince-1 (creak) : https://freesound.org/s/125957/
+  porte-claque-1 (slam) : https://freesound.org/s/571797/
+  porte-claque-2 (slam) : https://freesound.org/s/266440/
+  cles-1 (keys) : https://freesound.org/s/235594/
+  cles-2 (keys) : https://freesound.org/s/443863/
+  casseroles-1 (metal) : https://freesound.org/s/209002/
+  verre-brise-1 (glass) : https://freesound.org/s/141563/
+  verre-brise-2 (glass) : https://freesound.org/s/465946/
+  telephone-1 (phone) : https://freesound.org/s/275163/
+  telephone-2 (phone) : https://freesound.org/s/245445/
+  sonnette-1 (doorbell) : https://freesound.org/s/123350/
+  sonnette-2 (doorbell) : https://freesound.org/s/786690/
+  horloge-1 (clock) : https://freesound.org/s/412751/
+  horloge-2 (clock) : https://freesound.org/s/42139/
+  gouttes-1 (drip) : https://freesound.org/s/219373/
+  gouttes-2 (drip) : https://freesound.org/s/499333/
+  machine-a-laver-1 (washer) : https://freesound.org/s/384121/
+  machine-a-laver-2 (washer) : https://freesound.org/s/182011/
+  ronflement-1 (snore) : https://freesound.org/s/432997/
+  ronflement-2 (snore) : https://freesound.org/s/760036/
+  papier-1 (paper) : https://freesound.org/s/151231/
+  papier-2 (paper) : https://freesound.org/s/59878/
+  train-1 (train) : https://freesound.org/s/530296/
+  train-2 (train) : https://freesound.org/s/593096/
+  sirene-1 (siren) : https://freesound.org/s/469363/
+  sirene-2 (siren) : https://freesound.org/s/451068/
+  voiture-1 (car) : https://freesound.org/s/171447/
+  voiture-2 (car) : https://freesound.org/s/268865/
+  klaxon-1 (horn) : https://freesound.org/s/461679/
+  klaxon-2 (horn) : https://freesound.org/s/235363/
+  avion-1 (plane) : https://freesound.org/s/211870/
+  avion-2 (plane) : https://freesound.org/s/131315/
+  helicoptere-1 (heli) : https://freesound.org/s/241190/
+  helicoptere-2 (heli) : https://freesound.org/s/534855/
+  orage-1 (thunder) : https://freesound.org/s/243782/
+  orage-2 (thunder) : https://freesound.org/s/195436/
+  vent-1 (wind) : https://freesound.org/s/117610/
+  vent-2 (wind) : https://freesound.org/s/534353/
+  pluie-1 (rain) : https://freesound.org/s/513395/
+  pluie-2 (rain) : https://freesound.org/s/320520/
+  oiseaux-1 (birds) : https://freesound.org/s/532192/
+  oiseaux-2 (birds) : https://freesound.org/s/362500/
+  corne-1 (foghorn) : https://freesound.org/s/507471/
+  corne-2 (foghorn) : https://freesound.org/s/507472/
+  boite-a-musique-1 (music) : https://freesound.org/s/139057/
+  boite-a-musique-2 (music) : https://freesound.org/s/346182/
+  tintements-1 (bell) : https://freesound.org/s/398496/
+  tintements-2 (bell) : https://freesound.org/s/239040/
+  cloche-eglise-1 (church) : https://freesound.org/s/554655/
+  cloche-eglise-2 (church) : https://freesound.org/s/852491/
+  gong-1 (gong) : https://freesound.org/s/735855/
+  gong-2 (gong) : https://freesound.org/s/486629/
+  bol-chantant-1 (bowl) : https://freesound.org/s/202004/
+  bol-chantant-2 (bowl) : https://freesound.org/s/439235/
+  flute-1 (flute) : https://freesound.org/s/816095/
+  flute-2 (flute) : https://freesound.org/s/336302/
+  coup-sourd-1 (thud) : https://freesound.org/s/443494/
+  coup-sourd-2 (thud) : https://freesound.org/s/616295/
+  detonation-1 (blast) : https://freesound.org/s/372086/
+  detonation-2 (blast) : https://freesound.org/s/132861/
+  voix-lointaines-fr-1 (voices) : https://freesound.org/s/135861/
+  voix-lointaines-fr-2 (voices) : https://freesound.org/s/645563/
+  foule-fr-1 (crowd) : https://freesound.org/s/322120/
+  foule-fr-2 (crowd) : https://freesound.org/s/733849/
+  voix-radio-fr-1 (radio) : https://freesound.org/s/740998/
+  voix-radio-fr-2 (radio) : https://freesound.org/s/610081/
+  voix-radio-fr-3 (radio) : https://freesound.org/s/399526/
+  appel-fr-1 (shout) : https://freesound.org/s/361825/
+  appel-fr-2 (shout) : https://freesound.org/s/874434/
+  chuchotements-fr-1 (whisper) : https://freesound.org/s/117470/
+  tambour-chamanique-1 (drums) : https://freesound.org/s/535510/ (passage le plus régulier, 200 coups/min)
+  tambour-chamanique-2 (drums) : https://freesound.org/s/535510/ (vrais coups de ce tambour, recomposés en battement régulier à 210 coups/min)
