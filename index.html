@@ -364,6 +364,10 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
 .hold .fill{display:none}
 #prepCount.ring{width:140px;height:140px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:3rem;position:relative;isolation:isolate;overflow:hidden;color:var(--text);flex:none}
 .segctl{position:relative}
+.voice{margin:10px 0 4px}
+.voicebtn{width:100%;min-height:64px;border-radius:18px;font-size:var(--fs-3);font-weight:600;border-color:var(--accent);color:var(--accent)}
+.voicebtn.rec{color:var(--accent-ink)}
+#voicePlayRow{flex-wrap:nowrap}#voicePlay{flex:1;min-width:0;height:44px}
 #view-setup{overflow-x:clip}
 .segctl .blob{position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;background:var(--accent);z-index:0;pointer-events:none}
 .segctl button{position:relative;z-index:1;transition:color .3s}
@@ -735,6 +739,11 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
     <div class="cards" id="sumCards"></div>
     <label for="sumNote" class="lbl">Ce que tu as ressenti</label>
     <textarea id="sumNote" placeholder="Vibrations, sons perçus en dehors de l'audio, sortie, rien…"></textarea>
+    <div class="voice" id="voiceBox">
+      <button id="btnVoice" class="voicebtn"><span id="voiceLab">🎙 Dicter mon ressenti</span></button>
+      <div class="row" id="voicePlayRow" hidden><audio id="voicePlay" controls preload="metadata"></audio><button id="btnVoiceDel" class="danger" aria-label="Supprimer la note vocale">Supprimer</button></div>
+      <p class="hint" id="voiceMsg"></p>
+    </div>
     <details class="notion">
       <summary><span>Résumé de la séance</span></summary>
       <pre id="sumText"></pre>
@@ -834,7 +843,7 @@ const SampleDB={
   async open(){
     if(this.db)return this.db;
     if(!('indexedDB' in window))throw new Error('Stockage des sons indisponible dans ce navigateur.');
-    this.db=await new Promise((res,rej)=>{const r=indexedDB.open('vibrostase',2);r.onupgradeneeded=()=>{const d=r.result;for(const n of ['samples','analysis'])if(!d.objectStoreNames.contains(n))d.createObjectStore(n,{keyPath:'id'});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+    this.db=await new Promise((res,rej)=>{const r=indexedDB.open('vibrostase',3);r.onupgradeneeded=()=>{const d=r.result;for(const n of ['samples','analysis','voice'])if(!d.objectStoreNames.contains(n))d.createObjectStore(n,{keyPath:'id'});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
     return this.db;
   },
   async all(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('samples').objectStore('samples').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
@@ -844,6 +853,11 @@ const SampleDB={
   async aGet(id){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('analysis').objectStore('analysis').get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);});},
   async aKeys(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('analysis').objectStore('analysis').getAllKeys();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
   async aPut(rec){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('analysis','readwrite');t.objectStore('analysis').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  // notes vocales : {id: id de séance, type, data (ArrayBuffer), sec}
+  async vGet(id){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('voice').objectStore('voice').get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);});},
+  async vAll(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('voice').objectStore('voice').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
+  async vPut(rec){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('voice','readwrite');t.objectStore('voice').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  async vDel(ids){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('voice','readwrite');for(const id of ids)t.objectStore('voice').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
   async aDel(ids){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('analysis','readwrite');for(const id of ids)t.objectStore('analysis').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
 };
 
@@ -1572,7 +1586,7 @@ class IntensityController{
     const seg=this.seg,dur=this.durations[this.idx],last=this.idx>=this.seq.length-1;
     if(ad&&ad.skip&&seg.type==='stase'&&!last&&this.elapsed>=30&&(this.elapsed<dur||this.hold)){this.hold=false;this.onAdapt&&this.onAdapt('skip',0);this._advance();this._value(dt);return;}
     if(this.elapsed<dur){this.elapsed=Math.min(dur,this.elapsed+dt);this.hold=false;}
-    else if(seg.type==='stase'&&!last&&gate&&gate.active&&!gate.calm&&!(ad&&ad.asleep)&&this.holdSeg<gate.maxHold){this.holdSeg+=dt;this.hold=true;this.holdKind='calm';}
+    else if(seg.type==='stase'&&!last&&gate&&gate.active&&!gate.calm&&!(ad&&(ad.asleep||ad.still))&&this.holdSeg<gate.maxHold){this.holdSeg+=dt;this.hold=true;this.holdKind='calm';}
     else if(seg.type==='silence'&&ad&&ad.hold&&this.holdSeg<ad.maxHold){if(!this.hold||this.holdKind!=='ev')this.onAdapt&&this.onAdapt('hold',0);this.holdSeg+=dt;this.hold=true;this.holdKind='ev';}
     else{this.hold=false;this._advance();}
     this._value(dt);
@@ -1952,7 +1966,9 @@ function trackStats(r){
   const first=f=>{const x=sm.find(f);return x?x.t:null;};
   const runs=code=>{const out=[];let cur=null;for(const x of sm){if(x.st===code){if(!cur)cur={t:x.t,end:x.t};cur.end=x.t;}else if(cur){out.push(cur);cur=null;}}if(cur)out.push(cur);return out;};
   const sleepSec=sm.filter(x=>SLEEPING(x.st)).length*dt;
-  return {relax:first(x=>x.st>=ST.relax),stase:first(x=>x.st>=ST.stase),sleep:first(x=>SLEEPING(x.st)),sleepSec,
+  // tous les endormissements (passage d'un état éveillé à un état de sommeil), pour comparer chaque repère au plus proche
+  const onsets=[];{let was=false;for(const x of sm){if(x.st<0)continue;const sl=SLEEPING(x.st);if(sl&&!was)onsets.push(x.t);was=sl;}}
+  return {relax:first(x=>x.st>=ST.relax),stase:first(x=>x.st>=ST.stase),sleep:first(x=>SLEEPING(x.st)),sleepSec,onsets,
     ev:runs(ST.ev),rem:runs(ST.rem),deepSec:sm.filter(x=>x.st===ST.deep).length*dt,
     jerks:tr.jerks||[],noise:tr.noise||[],blkAt,known:sm.filter(x=>x.st>=0).length};
 }
@@ -1969,13 +1985,15 @@ function trackText(r){
   if(s.jerks.length)L.push(`  sursaut${s.jerks.length>1?'s':''} : ${s.jerks.map(fmtTime).join(', ')}`);
   if(s.noise.length)L.push(`  bruit${s.noise.length>1?'s':''} extérieur${s.noise.length>1?'s':''} : ${s.noise.map(n=>`${fmtTime(n[0])} (+${n[1]} dB)${bl(n[0])}`).join(', ')}`);
   if(r.adapt&&r.adapt.length)L.push('  déroulé adaptatif : '+r.adapt.map(a=>a.k==='skip'?`détente écourtée à ${fmtTime(a.t)} (endormissement)`:`silence prolongé de ${fmtTime(a.sec)} à ${fmtTime(a.t)} (activation)`).join(' ; '));
+  if(r.voiceSec)L.push(`Note vocale : ${fmtTime(r.voiceSec)} (à réécouter dans l'appli)`);
   const marks=(r.marks||[]).slice().sort((a,b)=>a.t-b.t);
   if(marks.length){
     L.push('Ressenti noté sur le graphique :');
     for(const m of marks){
       let txt=`  ${fmtTime(m.t)} (${clockAt(r.startedAt,m.t)}) ${MARKS[m.k]||m.k}${bl(m.t)}`;
       if(m.k==='ev'){const near=s.ev.filter(e=>Math.abs(e.t-m.t)<=180||(m.t>=e.t&&m.t<=e.end+60));txt+=near.length?`, activation mesurée à ${fmtTime(near[0].t)}`:', aucune activation mesurée autour';}
-      if((m.k==='sleep'||m.k==='hypna')&&s.sleep!=null)txt+=`, sommeil léger estimé à ${fmtTime(s.sleep)} (écart ${fmtTime(Math.abs(s.sleep-m.t))})`;
+      if((m.k==='sleep'||m.k==='hypna')&&s.onsets&&s.onsets.length){const o=s.onsets.reduce((a,b)=>Math.abs(b-m.t)<Math.abs(a-m.t)?b:a);
+        txt+=`, endormissement estimé le plus proche à ${fmtTime(o)} (${fmtTime(Math.abs(o-m.t))} ${m.t<=o?'avant':'après'})`;}
       else if(m.k==='hypna'||m.k==='sleep')txt+=', aucun endormissement estimé';
       L.push(txt);
     }
@@ -3031,7 +3049,9 @@ function trackStart(cal){
     if(!tracker)return null;
     // endormi : l'attente cardio n'a plus de raison de retenir la détente, même sans le déroulé adaptatif
     const asleep=tracker.asleepFor>0,on=settings.track.adaptive;
-    return {asleep,skip:on&&tracker.asleepFor>=settings.track.sleepSkip*60,hold:on&&tracker.evRecent,maxHold:settings.track.evHold*60};
+    // immobile depuis 3 min : l'état visé est atteint, inutile d'attendre encore le cœur
+    const still=tracker.state===ST.stase&&tracker.info&&tracker.info.imm!=null&&tracker.info.imm>=180;
+    return {asleep,still,skip:on&&tracker.asleepFor>=settings.track.sleepSkip*60,hold:on&&tracker.evRecent,maxHold:settings.track.evHold*60};
   };
   trackTimer=setInterval(()=>{
     if(!session||!tracker)return;
@@ -3111,7 +3131,7 @@ function showSummary(r,fresh){
   $('#sumTitle').textContent=fresh?'Séance terminée':recLabel(r);
   $('#sumSub').textContent=`${fresh?recLabel(r)+' · ':''}${d.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'})} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · ${fmtTime(r.actualSec)}`;
   $('#btnBack').textContent=fresh?'‹ Séance':'‹ Journal';renderSumCards(r);renderMarkBar();
-  $('#sumNote').value=r.note||'';$('#sumText').textContent=summaryText(r);$('#copyMsg').textContent='';$('#pngMsg').textContent='';
+  $('#sumNote').value=r.note||'';$('#voiceMsg').textContent='';Voice.show(r);$('#sumText').textContent=summaryText(r);$('#copyMsg').textContent='';$('#pngMsg').textContent='';
   $('#markSheet').hidden=true;
   const has=!!(r.track&&r.track.st&&r.track.st.length);$('#sumGraphBox').hidden=!has;
   go('summary');
@@ -3223,7 +3243,7 @@ function updateCmpRow(){
   $('#cmpHint').textContent=!n?'Coche des séances pour les supprimer, ou 2 à 3 séances avec graphique pour les superposer.':n>3?'Superposer : 3 séances au plus.':(n>=2&&withTrack<n)?'Superposer : seulement des séances avec graphique.':'';
 }
 function deleteRecords(ids){
-  const set=new Set(ids);saveHistory(h=>h.filter(r=>!set.has(r.id)));SampleDB.aDel([...set]).catch(()=>{});
+  const set=new Set(ids);saveHistory(h=>h.filter(r=>!set.has(r.id)));SampleDB.aDel([...set]).catch(()=>{});SampleDB.vDel([...set]).catch(()=>{});
   for(const id of set)cmpSel.delete(id);
   if(lastRecord&&set.has(lastRecord.id))lastRecord=null;
 }
@@ -3455,7 +3475,8 @@ async function exportBackup(){
   const msg=$('#bkMsg');msg.textContent='Préparation…';
   const withS=$('#bkSamples').checked;
   const data={app:'vibralia',format:1,exportedAt:new Date().toISOString(),settings,sequences:Store.get('sequences',{})||{},history:Store.get('history',[])||[],
-    samples:withS?samples.map(x=>({id:x.id,name:x.name,family:x.family,data:b64encode(x.data)})):[]};
+    samples:withS?samples.map(x=>({id:x.id,name:x.name,family:x.family,data:b64encode(x.data)})):[],
+    voice:await SampleDB.vAll().then(a=>a.map(v=>({id:v.id,type:v.type,sec:v.sec,data:b64encode(v.data)}))).catch(()=>[])};
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const name=`vibralia-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
   const r=await saveFile(name,blob);
@@ -3484,6 +3505,7 @@ async function importBackup(file){
       const rec={id:x.id,name:String(x.name||'son').slice(0,120),family:famById(x.family)?x.family:'custom',data:buf};await SampleDB.put(rec);samples.push(rec);addedS++;}
     catch(e){badS++;}
   }
+  if(Array.isArray(d.voice))for(const v of d.voice){try{if(!v||typeof v.id!=='string'||await SampleDB.vGet(v.id))continue;const buf=b64decode(String(v.data||''));if(buf.byteLength&&buf.byteLength<20*1024*1024)await SampleDB.vPut({id:v.id,type:String(v.type||'audio/webm'),sec:+v.sec||0,data:buf});}catch(e){}}
   if(engine.ctx)await decodeSamples();
   applyHrSource();refreshForm();renderSamples();renderHistory();
   msg.textContent=`Restauration faite : réglages et modèles repris, ${addedH} séance${addedH>1?'s':''} et ${addedS} son${addedS>1?'s':''} ajouté${addedS>1?'s':''}${badS?`, ${badS} son${badS>1?'s':''} illisible${badS>1?'s':''}`:''}.`;
@@ -3620,6 +3642,43 @@ $('#anNotes').addEventListener('change',()=>{const p=anProfile();p.noNotes=!$('#
 $('#anAuto').addEventListener('change',()=>{const p=anProfile();p.asked=true;p.consent=$('#anAuto').checked?'auto':'manual';anSave(p);renderAnalysis();if(p.consent==='auto')anAutoSend();});
 document.querySelector('[data-open="analysis"]').addEventListener('click',renderAnalysis);
 renderAnalysis();
+/* ===== note vocale de fin de séance : un gros bouton, toucher pour commencer, toucher pour finir ===== */
+const Voice={rec:null,chunks:[],t0:0,timer:0,url:null,
+  async show(r){
+    const btn=$('#btnVoice'),row=$('#voicePlayRow'),au=$('#voicePlay');
+    if(this.url){URL.revokeObjectURL(this.url);this.url=null;}
+    if(this.rec)return;
+    let v=null;try{v=r&&await SampleDB.vGet(r.id);}catch(e){}
+    if(v){this.url=URL.createObjectURL(new Blob([v.data],{type:v.type}));au.src=this.url;row.hidden=false;btn.hidden=true;}
+    else{au.removeAttribute('src');row.hidden=true;btn.hidden=!(window.MediaRecorder&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);}
+  },
+  async toggle(){
+    const btn=$('#btnVoice'),lab=$('#voiceLab'),msg=$('#voiceMsg'),r=viewRec;if(!r)return;
+    if(this.rec){this.rec.stop();return;}
+    if(window.VibrostaseNative&&!(await askMic())){msg.textContent='Micro refusé : autorise-le dans les paramètres Android.';return;}
+    let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}
+    catch(e){msg.textContent='Micro inaccessible ici.';return;}
+    const type=['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
+    const mr=new MediaRecorder(stream,type?{mimeType:type,audioBitsPerSecond:24000}:{});this.rec=mr;this.chunks=[];this.t0=performance.now();
+    mr.ondataavailable=e=>{if(e.data&&e.data.size)this.chunks.push(e.data);};
+    mr.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());clearInterval(this.timer);this.rec=null;btn.classList.remove('rec');Liquid.of(btn).to(0,500,'in');
+      const sec=Math.round((performance.now()-this.t0)/1000),blob=new Blob(this.chunks,{type:mr.mimeType||type||'audio/webm'});lab.textContent='🎙 Dicter mon ressenti';
+      if(sec<1||!blob.size){msg.textContent='Trop court, rien d’enregistré.';return;}
+      try{await SampleDB.vPut({id:r.id,type:blob.type,data:await blob.arrayBuffer(),sec});r.voiceSec=sec;saveHistory(h=>{const k=h.findIndex(x=>x.id===r.id);if(k>=0)h[k].voiceSec=sec;return h;});
+        msg.textContent=`Note vocale enregistrée (${fmtTime(sec)}).`;$('#sumText').textContent=summaryText(r);this.show(r);}catch(e){msg.textContent='Enregistrement impossible : '+e.message;}};
+    mr.start(1000);haptic();btn.classList.add('rec');Liquid.of(btn,{color:LQ.acc,crest:LQ.rim,idle:.35}).to(1,600,'out');
+    const tick=()=>{lab.textContent=`■ Terminer · ${fmtTime(Math.round((performance.now()-this.t0)/1000))}`;};tick();this.timer=setInterval(tick,500);
+    // garde-fou : 10 minutes au plus
+    setTimeout(()=>{if(this.rec===mr)mr.stop();},600000);
+  }
+};
+$('#btnVoice').addEventListener('click',()=>Voice.toggle());
+$('#btnVoiceDel').addEventListener('click',async()=>{const r=viewRec;if(!r)return;if(!confirmTap($('#btnVoiceDel'),'Confirmer')) return;
+  try{await SampleDB.vDel([r.id]);}catch(e){}delete r.voiceSec;saveHistory(h=>{const k=h.findIndex(x=>x.id===r.id);if(k>=0)delete h[k].voiceSec;return h;});$('#sumText').textContent=summaryText(r);$('#voiceMsg').textContent='Note vocale supprimée.';Voice.show(r);});
+// double appui pour supprimer, sans boîte de dialogue
+function confirmTap(b,txt){if(b.dataset.armed&&performance.now()-b.dataset.armed<4000){delete b.dataset.armed;b.textContent=b.dataset.lab;return true;}
+  b.dataset.lab=b.dataset.lab||b.textContent;b.dataset.armed=performance.now();b.textContent=txt;setTimeout(()=>{if(b.dataset.armed){delete b.dataset.armed;b.textContent=b.dataset.lab;}},4000);return false;}
+
 /* ===== écran de lancement : le cercle se trace, le V tombe, le liquide monte et l'immerge ===== */
 (function(){
   const sp=document.getElementById('splash');if(!sp)return;
@@ -3690,6 +3749,7 @@ document.querySelectorAll('.segctl').forEach(seg=>{
 });
 // mesures orphelines (séances supprimées ou sorties de l'historique) : on fait le ménage
 SampleDB.aKeys().then(k=>{const ids=new Set((Store.get('history',[])||[]).map(r=>r.id)),old=k.filter(x=>!ids.has(x));if(old.length)SampleDB.aDel(old);}).catch(()=>{});
+SampleDB.vAll().then(v=>{const ids=new Set((Store.get('history',[])||[]).map(r=>r.id)),old=v.map(x=>x.id).filter(x=>!ids.has(x));if(old.length)SampleDB.vDel(old);}).catch(()=>{});
 $('#btnImportBk').addEventListener('click',()=>$('#bkFile').click());
 $('#bkFile').addEventListener('change',ev=>{const f=ev.target.files[0];ev.target.value='';if(f)importBackup(f);});
 
