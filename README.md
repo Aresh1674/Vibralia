@@ -6,7 +6,7 @@ Sons qui imitent l'état vibratoire (EV) pour aider à le provoquer à la fronti
 
 ## Android : installer l'appli (recommandé)
 
-1. Ouvre **[la dernière version](https://github.com/Aresh1674/vibrostase-web/releases/latest)** sur le téléphone et touche le fichier `vibralia-….apk`.
+1. Ouvre **[la dernière version](https://github.com/Aresh1674/Vibralia/releases/latest)** sur le téléphone et touche le fichier `vibralia-….apk`.
 2. Ouvre le fichier téléchargé. Android demande d'autoriser le navigateur à installer des applis : accepte.
    Si Play Protect prévient que l'appli est inconnue : **Plus de détails › Installer quand même** (elle ne vient pas du Play Store).
 3. Au premier lancement, autorise les **notifications** (séance en arrière-plan).
@@ -17,7 +17,7 @@ L'appli Android est la plus complète : son qui tient écran verrouillé, mouvem
 
 ## iPhone et ordinateur : version web
 
-Ouvre **https://aresh1674.github.io/vibrostase-web/**. Sur iPhone : Safari › Partager › **Sur l'écran d'accueil**.
+Ouvre **https://aresh1674.github.io/Vibralia/**. Sur iPhone : Safari › Partager › **Sur l'écran d'accueil**.
 
 Limites de la version web : garde l'écran allumé (« Écran noir » l'assombrit), sinon le son s'arrête ; pas de montre en Bluetooth dans Safari ; les données d'analyse s'exportent à la main.
 
