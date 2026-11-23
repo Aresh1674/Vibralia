@@ -357,6 +357,7 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
 .hold .fill{display:none}
 #prepCount.ring{width:140px;height:140px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:3rem;position:relative;isolation:isolate;overflow:hidden;color:var(--text);flex:none}
 .segctl{position:relative}
+#view-setup{overflow-x:clip}
 .segctl .blob{position:absolute;top:4px;bottom:4px;left:0;width:0;border-radius:999px;background:var(--accent);z-index:0;pointer-events:none}
 .segctl button{position:relative;z-index:1;transition:color .3s}
 .segctl.blobbed button[aria-pressed="true"]{background:transparent}
@@ -2413,7 +2414,7 @@ function renderPresetChips(){
   const box=$('#presetChips');box.innerHTML='';const cur=currentPreset();
   const A=tileAnim;tileAnim=null;
   const add=(id,label,seq)=>{const on=!!cur&&cur.id===id;const b=el('button',{type:'button',class:'tile','aria-pressed':String(on),
-    onclick:e=>{if(on)return;tileAnim={from:cur&&cur.id,to:id,x:Liquid.x(b,e)};haptic();settings.sequence=sanitizeSeq(clone(seq));commitSeq();renderSteps();}},[el('b',{text:label}),el('span',{text:fmtNum(seq.reduce((a,x)=>a+(+x.min||0),0))+' min'})]);
+    onclick:e=>{if(on)return;tileAnim={from:cur&&cur.id,to:id,x:Liquid.x(b,e)};haptic();settings.sequence=sanitizeSeq(clone(seq));commitSeq();renderSteps();animateWagons($('#tlSetup'));}},[el('b',{text:label}),el('span',{text:fmtNum(seq.reduce((a,x)=>a+(+x.min||0),0))+' min'})]);
     box.append(b);const L=Liquid.of(b,{color:LQ.tint,crest:LQ.acc});
     if(on){if(A&&A.to===id){L.o.x=A.x;L.to(1,750,'out');}else L.to(1,1);}
     else if(A&&A.from===id){L.to(1,1);L.to(0,600,'in');}};
@@ -2491,6 +2492,19 @@ function renderTimeline(box,seq){
     seg.append(el('span',{text:room>=lab.length*6.6+6?lab:''}));box.append(seg);
   }
   const mk=el('div',{class:'marker'});mk.hidden=true;box.append(mk);
+}
+// arrivée de la frise « en wagons » : chaque étape arrive de la droite, tape la précédente, puis tout se cale
+function animateWagons(box){
+  if(reduced||!box)return;const segs=[...box.querySelectorAll('.seg')];if(!segs.length)return;
+  const W=window.innerWidth;
+  segs.forEach((s,k)=>{const r=s.getBoundingClientRect(),dx=Math.max(60,W-r.left+20),delay=k*110,lab=s.querySelector('span');
+    if(lab)lab.style.opacity=0;
+    s.animate([{transform:`translateX(${dx}px)`},{transform:'translateX(0)'}],{duration:420,delay,easing:'cubic-bezier(.3,.6,.4,1)',fill:'backwards'});
+    setTimeout(()=>{
+      s.animate([{transform:'scaleX(.86)',transformOrigin:'left'},{transform:'scaleX(1.04)',transformOrigin:'left'},{transform:'scaleX(1)',transformOrigin:'left'}],{duration:260,easing:'ease-out'});
+      for(let j=k-1,a=6;j>=0&&a>.6;j--,a*=.55)segs[j].animate([{transform:'translateX(0)'},{transform:`translateX(${-a}px)`},{transform:`translateX(${a*.3}px)`},{transform:'translateX(0)'}],{duration:300,delay:(k-1-j)*25,easing:'ease-out'});
+      if(lab)lab.animate([{opacity:0,transform:'translateY(-4px)'},{opacity:1,transform:'none'}],{duration:260,delay:120,fill:'forwards'}).onfinish=()=>{lab.style.opacity='';};
+    },delay+420);});
 }
 // valide chaque étape SUR PLACE : les lignes de l'éditeur gardent une référence vers ces objets
 function commitSeq(){
