@@ -1,14 +1,16 @@
-# Vibrostase
+# Vibralia
+
+*Anciennement « Vibrostase ».*
 
 Sons qui imitent l'état vibratoire (EV) pour aider à le provoquer à la frontière du sommeil, avec suivi du corps pendant la séance.
 
 ## Android : installer l'appli (recommandé)
 
-1. Ouvre **[la dernière version](https://github.com/Aresh1674/vibrostase-web/releases/latest)** sur le téléphone et touche le fichier `vibrostase-….apk`.
+1. Ouvre **[la dernière version](https://github.com/Aresh1674/vibrostase-web/releases/latest)** sur le téléphone et touche le fichier `vibralia-….apk`.
 2. Ouvre le fichier téléchargé. Android demande d'autoriser le navigateur à installer des applis : accepte.
    Si Play Protect prévient que l'appli est inconnue : **Plus de détails › Installer quand même** (elle ne vient pas du Play Store).
 3. Au premier lancement, autorise les **notifications** (séance en arrière-plan).
-4. Paramètres Android › Applis › Vibrostase › Batterie › **Sans restriction**.
+4. Paramètres Android › Applis › Vibralia › Batterie › **Sans restriction**.
 5. Mises à jour : installe la nouvelle version **par-dessus**, sans désinstaller. Désinstaller efface tes séances.
 
 L'appli Android est la plus complète : son qui tient écran verrouillé, mouvements mesurés écran éteint, montre cardio en Bluetooth, envoi des données d'analyse.
