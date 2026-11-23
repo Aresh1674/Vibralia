@@ -449,6 +449,18 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
           <button id="btnReorder" aria-pressed="false">Réorganiser</button>
         </div>
         <p class="hint">Durées en minutes, niveau en % de l'intensité maximale. Une montée ou une descente part du niveau de l'étape précédente.</p>
+        <details class="sub" data-sec="music">
+          <summary><span>Musique de fond</span><span class="sum" id="sumMusic"></span></summary>
+          <p class="hint" style="margin-top:0">Une musique de ton choix, en boucle sous toute la séance. On l'entend surtout pendant la détente et les silences. Elle est enregistrée avec ton modèle.</p>
+          <input id="musicFile" type="file" accept="audio/*" hidden>
+          <div class="row"><button id="btnMusicImport">Importer un fichier</button><button id="btnMusicPlay" hidden>▶ Écouter</button><button id="btnMusicDel" class="danger" hidden>Retirer</button></div>
+          <p class="hint" id="musicName"></p>
+          <div class="field"><label for="musicVol">Volume de la musique</label><output for="musicVol"></output>
+            <input id="musicVol" type="range" min="0.05" max="1" step="0.05" data-key="music.volume" data-fmt="pct"></div>
+          <label class="check"><input type="checkbox" data-key="music.duck">
+            <span>Baisser pendant l'EV<small>La musique descend à un quart de son volume le temps de l'EV, puis revient.</small></span></label>
+          <p class="hint">Fichier audio sur le téléphone (MP3, M4A, OGG…), gardé dans l'appli. Les liens YouTube ou Spotify ne peuvent pas être lus : leurs conditions interdisent la lecture du son seul en arrière-plan.</p>
+        </details>
         <details class="sub" data-sec="models">
           <summary>Mes modèles</summary>
           <div class="row">
@@ -635,7 +647,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
     <header class="pagehead"><button class="back" data-back="settings">‹ Réglages</button><h2>Sauvegarde</h2></header>
     <div class="pagebody">
         <label class="check"><input type="checkbox" id="bkSamples" checked>
-          <span>Inclure mes sons importés</span></label>
+          <span>Inclure mes sons et musiques importés</span></label>
         <div class="row">
           <button id="btnExport">Exporter</button>
           <input id="bkFile" type="file" accept=".json,application/json" hidden>
@@ -846,7 +858,7 @@ const SampleDB={
   async open(){
     if(this.db)return this.db;
     if(!('indexedDB' in window))throw new Error('Stockage des sons indisponible dans ce navigateur.');
-    this.db=await new Promise((res,rej)=>{const r=indexedDB.open('vibrostase',3);r.onupgradeneeded=()=>{const d=r.result;for(const n of ['samples','analysis','voice'])if(!d.objectStoreNames.contains(n))d.createObjectStore(n,{keyPath:'id'});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
+    this.db=await new Promise((res,rej)=>{const r=indexedDB.open('vibrostase',4);r.onupgradeneeded=()=>{const d=r.result;for(const n of ['samples','analysis','voice','music'])if(!d.objectStoreNames.contains(n))d.createObjectStore(n,{keyPath:'id'});};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
     return this.db;
   },
   async all(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('samples').objectStore('samples').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
@@ -861,6 +873,11 @@ const SampleDB={
   async vAll(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('voice').objectStore('voice').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
   async vPut(rec){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('voice','readwrite');t.objectStore('voice').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
   async vDel(ids){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('voice','readwrite');for(const id of ids)t.objectStore('voice').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  // musiques de fond : {id, name, type, data (ArrayBuffer)}
+  async mGet(id){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('music').objectStore('music').get(id);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);});},
+  async mAll(){const db=await this.open();return new Promise((res,rej)=>{const r=db.transaction('music').objectStore('music').getAll();r.onsuccess=()=>res(r.result||[]);r.onerror=()=>rej(r.error);});},
+  async mPut(rec){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('music','readwrite');t.objectStore('music').put(rec);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
+  async mDel(ids){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('music','readwrite');for(const id of ids)t.objectStore('music').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});},
   async aDel(ids){const db=await this.open();return new Promise((res,rej)=>{const t=db.transaction('analysis','readwrite');for(const id of ids)t.objectStore('analysis').delete(id);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}
 };
 
@@ -965,6 +982,7 @@ const DEFAULTS={
   volume:0.5, contrast:'medium', maxIntensity:0.85, baseFreq:55, sweepDepth:0.45, binaural:true, binauralBeat:6,
   pulseDepth:0.8, density:0.5, eventLevel:0.6, evDensity:0.7, evFocusChance:0.5, eerie:0.25,
   families:Object.fromEntries(FAMILIES.map(f=>[f.id,true])),
+  music:{id:null,volume:0.35,duck:true}, // musique de fond (fichier dans IndexedDB)
   mixSynth:{}, // familles où le son d'origine reste tiré au hasard avec les enregistrements importés
   showEvents:true,
   hr:{source:'none',waitCalm:true,calmDrop:5,maxWait:10,guard:true},
@@ -2446,7 +2464,10 @@ function renderPresetChips(){
   const box=$('#presetChips');box.innerHTML='';const cur=currentPreset();
   const A=tileAnim;tileAnim=null;
   const add=(id,label,seq)=>{const on=!!cur&&cur.id===id;const b=el('button',{type:'button',class:'tile','aria-pressed':String(on),
-    onclick:e=>{if(on)return;tileAnim={from:cur&&cur.id,to:id,x:Liquid.x(b,e)};haptic();settings.sequence=sanitizeSeq(clone(seq));commitSeq();renderSteps();animateWagons($('#tlSetup'));}},[el('b',{text:label}),el('span',{text:fmtNum(seq.reduce((a,x)=>a+(+x.min||0),0))+' min'})]);
+    onclick:e=>{if(on)return;tileAnim={from:cur&&cur.id,to:id,x:Liquid.x(b,e)};haptic();settings.sequence=sanitizeSeq(clone(seq));
+      // un modèle à soi emporte sa musique (ou son absence) ; un modèle fourni garde la musique en cours
+      if(id.startsWith('user:')){const mm=(Store.get('modelMusic',{})||{})[id.slice(5)];settings.music=mm?Object.assign({volume:0.35,duck:true},clone(mm)):Object.assign(settings.music,{id:null});renderMusic();refreshForm&&refreshForm();}
+      commitSeq();renderSteps();animateWagons($('#tlSetup'));}},[el('b',{text:label}),el('span',{text:fmtNum(seq.reduce((a,x)=>a+(+x.min||0),0))+' min'})]);
     box.append(b);const L=Liquid.of(b,{color:LQ.tint,crest:LQ.acc});
     if(on){if(A&&A.to===id){L.o.x=A.x;L.to(1,750,'out');}else L.to(1,1);}
     else if(A&&A.from===id){L.to(1,1);L.to(0,600,'in');}};
@@ -2589,8 +2610,10 @@ function initSeqUi(){
   $('#presetSel').addEventListener('change',()=>{$('#btnDelPreset').hidden=!$('#presetSel').value.startsWith('user:');});
   $('#btnLoadPreset').addEventListener('click',()=>{const seq=presetSeq($('#presetSel').value);if(seq){settings.sequence=sanitizeSeq(clone(seq));commitSeq();renderSteps();}});
   $('#btnSavePreset').addEventListener('click',()=>{const name=$('#presetName').value.trim();if(!name)return showMsg('Donne un nom au déroulé pour l\'enregistrer.');
-    const u=Store.get('sequences',{});u[name]=clone(settings.sequence);Store.set('sequences',u);$('#presetName').value='';renderPresets('user:'+name);});
-  $('#btnDelPreset').addEventListener('click',()=>{const v=$('#presetSel').value;if(!v.startsWith('user:'))return;const u=Store.get('sequences',{});delete u[v.slice(5)];Store.set('sequences',u);renderPresets();});
+    const u=Store.get('sequences',{});u[name]=clone(settings.sequence);Store.set('sequences',u);
+    const mm=Store.get('modelMusic',{})||{};if(settings.music.id)mm[name]=clone(settings.music);else delete mm[name];Store.set('modelMusic',mm);
+    $('#presetName').value='';renderPresets('user:'+name);});
+  $('#btnDelPreset').addEventListener('click',()=>{const v=$('#presetSel').value;if(!v.startsWith('user:'))return;const u=Store.get('sequences',{});delete u[v.slice(5)];Store.set('sequences',u);const mm=Store.get('modelMusic',{})||{};delete mm[v.slice(5)];Store.set('modelMusic',mm);pruneMusic();renderPresets();});
 }
 function presetSeq(v){if(v.startsWith('user:'))return (Store.get('sequences',{})||{})[v.slice(5)];const p=BUILTIN_PRESETS.find(x=>x.id===v);return p&&p.seq;}
 function renderPresets(select){
@@ -2810,12 +2833,13 @@ async function startSessionInner(){
     if(cal===false){abortStart();return;}
   }
   if(trk)trackStart(cal);
-  session.start();
+  if(Music.preview)Music.togglePreview();
+  session.start();Music.start();
   cancelAnimationFrame(rafId);rafId=requestAnimationFrame(draw);
 }
 let lastUi=0;
 function uiTick(v){
-  const now=performance.now();if(now-lastUi<250)return;lastUi=now;
+  const now=performance.now();if(now-lastUi<250)return;lastUi=now;Music.update(v);
   let label=`${SEG_TYPES[v.type].label}`;if(v.type==='ev'&&v.ev){label+=v.ev.style==='focus'?(settings.showEvents&&v.ev.fam?` : ${famById(v.ev.fam).label.toLowerCase()}`:' concentré'):' : cacophonie';}
   if(v.n>1)label+=` · ${v.idx+1}/${v.n}`;if(v.hold)label+=v.holdKind==='ev'?', prolongé (activation)':', en attente de détente';
   if(tracker)$('#runState').innerHTML=liveStateText();
@@ -2828,6 +2852,7 @@ function uiTick(v){
   if(b.dataset.int==='1'||b.dataset.msg==='1'){}else if(v.buffered!=null&&!$('#runCtl').hidden){b.hidden=false;b.textContent=`Lecture préparée : ${Math.round(v.buffered)} s d'avance, ${v.late} retard${v.late>1?'s':''} de calcul`;}else if(!b.dataset.msg)b.hidden=true;
 }
 function onEnd(rec){
+  Music.stop(rec.completed?3000:1200);
   // signal de fin : le service Android reste actif le temps qu'il se joue, écran éteint compris
   const wait=rec.completed?endSignal():0;
   releaseWake();setTimeout(()=>{if(!session&&window.VibrostaseNative)try{window.VibrostaseNative.sessionState(false,false);}catch(e){}},wait);cancelAnimationFrame(rafId);
@@ -3375,6 +3400,7 @@ function preflight(){
   });
 }
 function abortStart(){
+  Music.stop(300);
   startBlockedUntil=performance.now()+1500;
   releaseWake();if(window.VibrostaseNative)try{window.VibrostaseNative.sessionState(false,false);}catch(e){}
   PhoneSensors.stop();cancelAnimationFrame(rafId);session=null;
@@ -3479,6 +3505,7 @@ async function exportBackup(){
   const withS=$('#bkSamples').checked;
   const data={app:'vibralia',format:1,exportedAt:new Date().toISOString(),settings,sequences:Store.get('sequences',{})||{},history:Store.get('history',[])||[],
     samples:withS?samples.map(x=>({id:x.id,name:x.name,family:x.family,data:b64encode(x.data)})):[],
+    music:withS?await SampleDB.mAll().then(a=>a.map(m=>({id:m.id,name:m.name,type:m.type,data:b64encode(m.data)}))).catch(()=>[]):[],modelMusic:Store.get('modelMusic',{})||{},
     voice:await SampleDB.vAll().then(a=>a.map(v=>({id:v.id,type:v.type,sec:v.sec,data:b64encode(v.data)}))).catch(()=>[])};
   const blob=new Blob([JSON.stringify(data)],{type:'application/json'});
   const name=`vibralia-sauvegarde-${new Date().toISOString().slice(0,10)}.json`;
@@ -3508,6 +3535,8 @@ async function importBackup(file){
       const rec={id:x.id,name:String(x.name||'son').slice(0,120),family:famById(x.family)?x.family:'custom',data:buf};await SampleDB.put(rec);samples.push(rec);addedS++;}
     catch(e){badS++;}
   }
+  if(Array.isArray(d.music))for(const m of d.music){try{if(!m||typeof m.id!=='string'||await SampleDB.mGet(m.id))continue;const buf=b64decode(String(m.data||''));if(buf.byteLength&&buf.byteLength<=150*1024*1024)await SampleDB.mPut({id:m.id,name:String(m.name||'musique').slice(0,80),type:String(m.type||'audio/mpeg'),data:buf});}catch(e){}}
+  if(d.modelMusic&&typeof d.modelMusic==='object'){const mm=Store.get('modelMusic',{})||{};for(const [n,v] of Object.entries(d.modelMusic))if(!(n in mm)&&v&&typeof v.id==='string')mm[n]={id:v.id,volume:clamp(+v.volume||0.35,0.05,1),duck:v.duck!==false};Store.set('modelMusic',mm);}
   if(Array.isArray(d.voice))for(const v of d.voice){try{if(!v||typeof v.id!=='string'||await SampleDB.vGet(v.id))continue;const buf=b64decode(String(v.data||''));if(buf.byteLength&&buf.byteLength<20*1024*1024)await SampleDB.vPut({id:v.id,type:String(v.type||'audio/webm'),sec:+v.sec||0,data:buf});}catch(e){}}
   if(engine.ctx)await decodeSamples();
   applyHrSource();refreshForm();renderSamples();renderHistory();
@@ -3696,6 +3725,66 @@ $('#btnVoiceDel').addEventListener('click',async()=>{const r=viewRec;if(!r)retur
 // double appui pour supprimer, sans boîte de dialogue
 function confirmTap(b,txt){if(b.dataset.armed&&performance.now()-b.dataset.armed<4000){delete b.dataset.armed;b.textContent=b.dataset.lab;return true;}
   b.dataset.lab=b.dataset.lab||b.textContent;b.dataset.armed=performance.now();b.textContent=txt;setTimeout(()=>{if(b.dataset.armed){delete b.dataset.armed;b.textContent=b.dataset.lab;}},4000);return false;}
+
+
+/* ===== musique de fond : un fichier en boucle sous la séance, lu en flux (pas décodé en mémoire) ===== */
+const Music={el:null,url:null,cur:null,timer:0,level:0,target:0,preview:false,
+  async load(id){
+    if(this.cur===id&&this.url)return true;
+    if(this.url){URL.revokeObjectURL(this.url);this.url=null;}this.cur=null;
+    if(!id)return false;let m=null;try{m=await SampleDB.mGet(id);}catch(e){}
+    if(!m)return false;this.url=URL.createObjectURL(new Blob([m.data],{type:m.type||'audio/mpeg'}));this.cur=id;this.name=m.name;return true;
+  },
+  element(){if(!this.el){this.el=new Audio();this.el.loop=true;this.el.preload='auto';this.el.setAttribute('playsinline','');}return this.el;},
+  vol(){return clamp((settings.music.volume||0)*(settings.volume||0),0,1);},
+  apply(){const a=this.el;if(!a)return;this.level+=(this.target-this.level)*0.25;if(Math.abs(this.target-this.level)<0.004)this.level=this.target;a.volume=clamp(this.level,0,1);},
+  loop(){clearInterval(this.timer);this.timer=setInterval(()=>this.apply(),100);},
+  async start(){
+    if(!settings.music.id||!(await this.load(settings.music.id)))return;
+    const a=this.element();a.src=this.url;a.currentTime=0;this.level=0;a.volume=0;this.target=this.vol();
+    try{await a.play();}catch(e){return;}this.loop();
+  },
+  // appelé à chaque mise à jour de la séance : baisse pendant l'EV si demandé
+  update(v){if(!this.el||this.el.paused||this.preview)return;const d=settings.music.duck&&v&&v.type==='ev'?0.25:1;this.target=this.vol()*d;},
+  stop(fade=2500){
+    const a=this.el;if(!a||a.paused){clearInterval(this.timer);return;}this.target=0;const step=0.25*100/Math.max(100,fade);
+    clearInterval(this.timer);this.timer=setInterval(()=>{this.level=Math.max(0,this.level-Math.max(step,this.level*step*4));a.volume=this.level;if(this.level<=0.005){clearInterval(this.timer);a.pause();}},100);
+  },
+  async togglePreview(){
+    const b=$('#btnMusicPlay'),a=this.element();
+    if(this.preview){this.preview=false;a.pause();b.textContent='▶ Écouter';return;}
+    if(session||!(await this.load(settings.music.id)))return;
+    a.src=this.url;a.currentTime=0;this.level=this.target=this.vol();a.volume=this.level;this.preview=true;b.textContent='■ Arrêter';
+    try{await a.play();}catch(e){this.preview=false;b.textContent='▶ Écouter';}
+  }
+};
+async function renderMusic(){
+  const id=settings.music.id;let m=null;if(id)try{m=await SampleDB.mGet(id);}catch(e){}
+  if(id&&!m){settings.music.id=null;saveSettings();}
+  $('#musicName').textContent=m?`♪ ${m.name} · ${fmtSize(m.data.byteLength)}`:'Aucune musique.';
+  $('#btnMusicPlay').hidden=$('#btnMusicDel').hidden=!m;$('#btnMusicImport').textContent=m?'Changer':'Importer un fichier';
+  $('#sumMusic').textContent=m?m.name:'aucune';
+}
+// les musiques que plus rien n'utilise (réglages, modèles) sont effacées
+async function pruneMusic(){
+  try{const used=new Set([settings.music.id,...Object.values(Store.get('modelMusic',{})||{}).map(x=>x&&x.id)].filter(Boolean));
+    const all=await SampleDB.mAll(),old=all.map(x=>x.id).filter(x=>!used.has(x));if(old.length)await SampleDB.mDel(old);}catch(e){}
+}
+$('#btnMusicImport').addEventListener('click',()=>$('#musicFile').click());
+$('#musicFile').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  if(f.size>150*1024*1024)return showMsg('Fichier trop lourd (150 Mo au plus).');
+  const id='m'+Date.now().toString(36);
+  try{await SampleDB.mPut({id,name:f.name.replace(/\.[a-z0-9]{2,4}$/i,'').slice(0,80),type:f.type||'audio/mpeg',data:await f.arrayBuffer()});}catch(err){return showMsg('Import impossible : '+err.message);}
+  // vérifie que le téléphone sait lire ce format
+  const ok=await new Promise(res=>{const a=new Audio();const u=URL.createObjectURL(f);a.preload='metadata';a.onloadedmetadata=()=>{URL.revokeObjectURL(u);res(true);};a.onerror=()=>{URL.revokeObjectURL(u);res(false);};a.src=u;setTimeout(()=>res(true),4000);});
+  if(!ok){await SampleDB.mDel([id]);return showMsg('Ce format audio n’est pas lisible sur cet appareil.');}
+  if(Music.preview)Music.togglePreview();settings.music.id=id;saveSettings();await pruneMusic();renderMusic();
+});
+$('#btnMusicPlay').addEventListener('click',()=>Music.togglePreview());
+$('#btnMusicDel').addEventListener('click',async()=>{if(!confirmTap($('#btnMusicDel'),'Confirmer'))return;if(Music.preview)Music.togglePreview();settings.music.id=null;saveSettings();await pruneMusic();renderMusic();});
+document.querySelector('[data-sec=music]').addEventListener('toggle',e=>{if(!e.target.open&&Music.preview)Music.togglePreview();});
+renderMusic();pruneMusic();
 
 /* ===== écran de lancement : le cercle se trace, le V tombe, le liquide monte et l'immerge ===== */
 (function(){
