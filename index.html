@@ -365,6 +365,8 @@ select,input[type=number],input[type=text],textarea{font-size:var(--fs-b)}
 #prepCount.ring{width:140px;height:140px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:3rem;position:relative;isolation:isolate;overflow:hidden;color:var(--text);flex:none}
 .segctl{position:relative}
 .voice{margin:10px 0 4px}
+.voicebtn,.voicebtn *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .voicebtn{width:100%;min-height:64px;border-radius:18px;font-size:var(--fs-3);font-weight:600;border-color:var(--accent);color:var(--accent)}
 .voicebtn.rec{color:var(--accent-ink)}
 #voicePlayRow{flex-wrap:nowrap}#voicePlay{flex:1;min-width:0;height:44px}
@@ -3650,14 +3652,19 @@ const Voice={rec:null,chunks:[],t0:0,timer:0,url:null,
     if(this.rec)return;
     let v=null;try{v=r&&await SampleDB.vGet(r.id);}catch(e){}
     if(v){this.url=URL.createObjectURL(new Blob([v.data],{type:v.type}));au.src=this.url;row.hidden=false;btn.hidden=true;}
-    else{au.removeAttribute('src');row.hidden=true;btn.hidden=!(window.MediaRecorder&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia);}
+    else{au.removeAttribute('src');row.hidden=true;btn.hidden=!((window.VibrostaseNative&&window.VibrostaseNative.voiceStart)||(window.MediaRecorder&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia));}
   },
   async toggle(){
     const btn=$('#btnVoice'),lab=$('#voiceLab'),msg=$('#voiceMsg'),r=viewRec;if(!r)return;
+    const nat=window.VibrostaseNative;
+    if(this.rec==='native'){this.finishNative(r);return;}
     if(this.rec){this.rec.stop();return;}
-    if(window.VibrostaseNative&&!(await askMic())){msg.textContent='Micro refusé : autorise-le dans les paramètres Android.';return;}
+    if(nat&&!(await askMic())){msg.textContent='Micro refusé : autorise-le dans les paramètres Android.';return;}
+    // dans l'APK, c'est Android qui enregistre (le micro de la WebView n'est pas fiable)
+    if(nat&&nat.voiceStart){const ok=nat.voiceStart();if(ok!=='ok'){msg.textContent=ok==='permission'?'Micro refusé : autorise-le dans les paramètres Android.':'Micro inaccessible ('+ok+').';return;}
+      this.rec='native';this.t0=performance.now();this.recUI(r);return;}
     let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});}
-    catch(e){msg.textContent='Micro inaccessible ici.';return;}
+    catch(e){msg.textContent='Micro inaccessible ici ('+(e&&e.name||'erreur')+').';return;}
     const type=['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(t=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(t))||'';
     const mr=new MediaRecorder(stream,type?{mimeType:type,audioBitsPerSecond:24000}:{});this.rec=mr;this.chunks=[];this.t0=performance.now();
     mr.ondataavailable=e=>{if(e.data&&e.data.size)this.chunks.push(e.data);};
@@ -3666,10 +3673,20 @@ const Voice={rec:null,chunks:[],t0:0,timer:0,url:null,
       if(sec<1||!blob.size){msg.textContent='Trop court, rien d’enregistré.';return;}
       try{await SampleDB.vPut({id:r.id,type:blob.type,data:await blob.arrayBuffer(),sec});r.voiceSec=sec;saveHistory(h=>{const k=h.findIndex(x=>x.id===r.id);if(k>=0)h[k].voiceSec=sec;return h;});
         msg.textContent=`Note vocale enregistrée (${fmtTime(sec)}).`;$('#sumText').textContent=summaryText(r);this.show(r);}catch(e){msg.textContent='Enregistrement impossible : '+e.message;}};
-    mr.start(1000);haptic();btn.classList.add('rec');Liquid.of(btn,{color:LQ.acc,crest:LQ.rim,idle:.35}).to(1,600,'out');
+    mr.start(1000);this.recUI(r,()=>{if(this.rec===mr)mr.stop();});
+  },
+  recUI(r,stopFn){
+    const btn=$('#btnVoice'),lab=$('#voiceLab'),rec=this.rec;haptic();btn.classList.add('rec');Liquid.of(btn,{color:LQ.acc,crest:LQ.rim,idle:.35}).to(1,600,'out');
     const tick=()=>{lab.textContent=`■ Terminer · ${fmtTime(Math.round((performance.now()-this.t0)/1000))}`;};tick();this.timer=setInterval(tick,500);
     // garde-fou : 10 minutes au plus
-    setTimeout(()=>{if(this.rec===mr)mr.stop();},600000);
+    setTimeout(()=>{if(this.rec!==rec)return;if(rec==='native')this.finishNative(r);else stopFn&&stopFn();},600000);
+  },
+  async finishNative(r){
+    const btn=$('#btnVoice'),lab=$('#voiceLab'),msg=$('#voiceMsg');clearInterval(this.timer);this.rec=null;btn.classList.remove('rec');Liquid.of(btn).to(0,500,'in');lab.textContent='🎙 Dicter mon ressenti';
+    const sec=Math.round((performance.now()-this.t0)/1000);let b64='';try{b64=window.VibrostaseNative.voiceStop();}catch(e){}
+    if(!b64||sec<1){msg.textContent='Trop court, rien d’enregistré.';return;}
+    try{const data=b64decode(b64);await SampleDB.vPut({id:r.id,type:'audio/mp4',data,sec});r.voiceSec=sec;saveHistory(h=>{const k=h.findIndex(x=>x.id===r.id);if(k>=0)h[k].voiceSec=sec;return h;});
+      msg.textContent=`Note vocale enregistrée (${fmtTime(sec)}).`;$('#sumText').textContent=summaryText(r);this.show(r);}catch(e){msg.textContent='Enregistrement impossible : '+e.message;}
   }
 };
 $('#btnVoice').addEventListener('click',()=>Voice.toggle());
