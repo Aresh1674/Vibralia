@@ -744,6 +744,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
     <div class="voice" id="voiceBox">
       <button id="btnVoice" class="voicebtn"><span id="voiceLab">🎙 Dicter mon ressenti</span></button>
       <div class="row" id="voicePlayRow" hidden><audio id="voicePlay" controls preload="metadata"></audio><button id="btnVoiceDel" class="danger" aria-label="Supprimer la note vocale">Supprimer</button></div>
+      <p class="hint" id="voiceLimit">10 minutes au plus : l'enregistrement s'arrête tout seul au-delà.</p>
       <p class="hint" id="voiceMsg"></p>
     </div>
     <details class="notion">
@@ -3651,8 +3652,8 @@ const Voice={rec:null,chunks:[],t0:0,timer:0,url:null,
     if(this.url){URL.revokeObjectURL(this.url);this.url=null;}
     if(this.rec)return;
     let v=null;try{v=r&&await SampleDB.vGet(r.id);}catch(e){}
-    if(v){this.url=URL.createObjectURL(new Blob([v.data],{type:v.type}));au.src=this.url;row.hidden=false;btn.hidden=true;}
-    else{au.removeAttribute('src');row.hidden=true;btn.hidden=!((window.VibrostaseNative&&window.VibrostaseNative.voiceStart)||(window.MediaRecorder&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia));}
+    if(v){this.url=URL.createObjectURL(new Blob([v.data],{type:v.type}));au.src=this.url;row.hidden=false;btn.hidden=true;$('#voiceLimit').hidden=true;}
+    else{au.removeAttribute('src');row.hidden=true;$('#voiceLimit').hidden=false;btn.hidden=!((window.VibrostaseNative&&window.VibrostaseNative.voiceStart)||(window.MediaRecorder&&navigator.mediaDevices&&navigator.mediaDevices.getUserMedia));}
   },
   async toggle(){
     const btn=$('#btnVoice'),lab=$('#voiceLab'),msg=$('#voiceMsg'),r=viewRec;if(!r)return;
@@ -3677,7 +3678,7 @@ const Voice={rec:null,chunks:[],t0:0,timer:0,url:null,
   },
   recUI(r,stopFn){
     const btn=$('#btnVoice'),lab=$('#voiceLab'),rec=this.rec;haptic();btn.classList.add('rec');Liquid.of(btn,{color:LQ.acc,crest:LQ.rim,idle:.35}).to(1,600,'out');
-    const tick=()=>{lab.textContent=`■ Terminer · ${fmtTime(Math.round((performance.now()-this.t0)/1000))}`;};tick();this.timer=setInterval(tick,500);
+    const tick=()=>{const e=Math.round((performance.now()-this.t0)/1000),left=600-e;lab.textContent=left<=30?`■ Terminer · fin dans ${Math.max(0,left)} s`:`■ Terminer · ${fmtTime(e)} / 10:00`;};tick();this.timer=setInterval(tick,500);
     // garde-fou : 10 minutes au plus
     setTimeout(()=>{if(this.rec!==rec)return;if(rec==='native')this.finishNative(r);else stopFn&&stopFn();},600000);
   },
