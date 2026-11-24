@@ -227,6 +227,11 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .homehead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:0 0 14px}
 #logoMark{width:52px;height:52px;flex:none;border-radius:24%;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 /* écran de lancement : le V s'immerge */
+#trainStats p{margin:.35em 0}
+#trainStats b{color:var(--text)}
+.tapcount{font-size:2.4rem;font-weight:700;text-align:center;margin:.2em 0;color:var(--accent)}
+.anslist{margin:.4em 0 .6em;padding-left:1.1em}
+.anslist li{margin:.2em 0}
 #splash{position:fixed;inset:0;z-index:100;background:#12132a;display:grid;place-items:center;transition:opacity .35s ease,transform .35s ease}
 html.splashing,html.splashing body{overflow:hidden}
 html.splashing::-webkit-scrollbar{display:none}
@@ -432,7 +437,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
     <p class="grp">Séance</p>
     <div class="group-card"><button class="item" data-open="drone"><span class="it-t">Son</span><span class="sum" id="sumDrone"></span></button><button class="item" data-open="sounds"><span class="it-t">Sons secondaires</span><span class="sum" id="sumSounds"></span></button><button class="item" data-open="seq"><span class="it-t">Déroulé et modèles</span><span class="sum" id="sumSeq2"></span></button></div>
     <p class="grp">Capteurs</p>
-    <div class="group-card"><button class="item" data-open="hr"><span class="it-t">Montre cardio</span><span class="sum" id="sumHr"></span></button><button class="item" data-open="track"><span class="it-t">Suivi du corps</span><span class="sum" id="sumTrack"></span></button></div>
+    <div class="group-card"><button class="item" data-open="hr"><span class="it-t">Montre cardio</span><span class="sum" id="sumHr"></span></button><button class="item" data-open="track"><span class="it-t">Suivi du corps</span><span class="sum" id="sumTrack"></span></button><button class="item" data-open="train"><span class="it-t">Entraînement de la détection</span><span class="sum" id="sumTrain">Séance Sommeil</span></button></div>
     <p class="grp">Téléphone</p>
     <div class="group-card"><button class="item" data-open="tech"><span class="it-t">Lecture et écran</span><span class="sum" id="sumTech"></span></button></div>
     <p class="grp">Aide</p>
@@ -658,6 +663,32 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
         <p class="hint">Réglages, modèles, séances et sons dans un seul fichier, pour les retrouver ailleurs. La restauration remplace les réglages et ajoute ce qui manque.</p>
         <p class="hint" id="bkMsg"></p>
       
+    </div>
+  </section>
+  <section class="subpage" id="page-train" hidden>
+    <header class="pagehead"><button class="back" data-back="settings">‹ Réglages</button><h2>Entraînement de la détection</h2></header>
+    <div class="pagebody">
+      <p class="hint">Des séances à part, qui ne comptent pas dans tes statistiques. Elles servent à comparer ce que l'appli estime avec ce que tu vis vraiment.</p>
+      <p class="grp">Séance Sommeil</p>
+      <p class="hint">Pas de sons d'EV : seulement le silence, ou ta musique de fond. De temps en temps, un bip (trois notes courtes qui montent). Réponds en <b>tapotant le téléphone du doigt</b>, dans les 10 secondes :</p>
+      <ul class="hint anslist"><li><b>3 tapes</b> : pleinement conscient</li><li><b>2 tapes</b> : bien détendu</li><li><b>1 tape</b> : à la frontière, hypnagogie</li><li><b>Aucune</b> : endormi, ou plus assez conscient pour répondre</li></ul>
+      <p class="hint">Le bip sonne quand l'appli pense que tu viens de t'endormir, et aussi au hasard toutes les 6 à 10 minutes. Jamais deux bips à moins de 4 minutes ; après deux bips sans réponse, plus rien pendant 20 minutes.</p>
+      <div class="field"><label for="trMin">Durée</label><output for="trMin"></output>
+        <input id="trMin" type="range" min="15" max="120" step="5" data-key="train.min" data-fmt="min"></div>
+      <div class="field"><label for="trVol">Volume du bip</label><output for="trVol"></output>
+        <input id="trVol" type="range" min="0.1" max="1" step="0.05" data-key="train.vol" data-fmt="pct"></div>
+      <div class="field"><label for="trSens">Sensibilité des tapes</label><span></span>
+        <select id="trSens" data-key="train.sens" style="grid-column:1 / -1">
+          <option value="low">Faible : tapes franches</option>
+          <option value="mid">Moyenne</option>
+          <option value="high">Forte : tapes légères</option>
+        </select></div>
+      <div class="row"><button id="btnProbeTest">Tester le bip et les tapes</button></div>
+      <div id="probeTest" hidden><div class="tapcount" id="tapCount">0</div></div>
+      <p class="hint" id="probeTestMsg">Pose le téléphone comme pour une séance, lance le test et tape quand le bip sonne.</p>
+      <div class="row"><button id="btnTrainStart" class="primary">Démarrer une séance Sommeil</button></div>
+      <p class="grp">Ta détection</p>
+      <div class="hint" id="trainStats"></div>
     </div>
   </section>
   <section class="subpage" id="page-help" hidden>
@@ -985,6 +1016,7 @@ const DEFAULTS={
   pulseDepth:0.8, density:0.5, eventLevel:0.6, evDensity:0.7, evFocusChance:0.5, eerie:0.25,
   families:Object.fromEntries(FAMILIES.map(f=>[f.id,true])),
   music:{id:null,volume:0.35,duck:true}, // musique de fond (fichier dans IndexedDB)
+  train:{min:45,vol:0.6,sens:'mid'}, // séances d'entraînement de la détection
   mixSynth:{}, // familles où le son d'origine reste tiré au hasard avec les enregistrements importés
   showEvents:true,
   hr:{source:'none',waitCalm:true,calmDrop:5,maxWait:10,guard:true},
@@ -1820,6 +1852,10 @@ class BodyTracker{
     if(!this.f)this.f={fast:a.slice(),slow:a.slice()};
     const f=this.f,kf=1-Math.exp(-dt/0.25),ks=1-Math.exp(-dt/4);let hp2=0;const br=[0,0,0];
     for(let i=0;i<3;i++){const hp=a[i]-f.fast[i];hp2+=hp*hp;f.fast[i]+=kf*(a[i]-f.fast[i]);f.slow[i]+=ks*(a[i]-f.slow[i]);br[i]=f.fast[i]-f.slow[i];}
+    // réponse à un bip d'entraînement : pics nets de l'accélération (tapes du doigt sur le téléphone)
+    const W=this.tapWin;
+    if(W&&!W.closed&&t>=W.from-0.3&&t<=W.to){const m=Math.sqrt(hp2);if(m>W.max)W.max=m;
+      if(!W.up&&m>=W.thr){W.up=true;if(t-W.last>=0.2){W.taps.push(t);W.last=t;}}else if(W.up&&m<W.thr*0.5)W.up=false;}
     // respiration : bande lente (inclinaison du téléphone), échantillonnée à 4 Hz
     const q=Math.floor(t*4);
     if(this.brAcc&&this.brAcc.q!==q){const b=this.brAcc;this.brBuf.push([b.q/4,b.v[0]/b.n,b.v[1]/b.n,b.v[2]/b.n]);
@@ -1841,7 +1877,10 @@ class BodyTracker{
       const w=this.moveSec.filter(x=>x[0]>t-90).map(x=>x[1]).sort((a,b)=>a-b),chest=this.o.position==='chest';
       if(w.length>=45){this.thrMove=clamp(w[Math.floor(w.length*0.25)]*4,chest?0.08:0.05,chest?0.35:0.25);this.jerkThr=Math.max(0.4,this.thrMove*3);}
     }
-    const active=v>this.thrMove;
+    // pendant la réponse à un bip, les tapes ne comptent ni comme mouvement ni comme sursaut
+    const W=this.tapWin,inTap=!!W&&t>=W.from-0.5&&b.sec<=W.to+1;
+    if(inTap&&v>this.thrMove)W.mv++;
+    const active=v>this.thrMove&&!inTap;
     if(active){if(!this.run)this.runStart=t-1;this.run++;this.runPeak=Math.max(this.runPeak,b.peak);if(this.run>=3)this.lastMoveT=t;
       // tu t'installes encore (gros mouvement dans les 5 premières minutes) : la référence cardio sera reprise une fois immobile
       if(this.run===10&&t<300){this.hrRef=[];this.hrBase=null;}}
@@ -1950,6 +1989,8 @@ class BodyTracker{
     const last=this.hrS.length?this.hrS[this.hrS.length-1]:null;
     this.samples.push({t,st:s,hr:last&&t-last[0]<15?Math.round(last[1]):0,bk:bi,br:this.br.rate?Math.round(this.br.rate*10):0});
   }
+  // ouvre la fenêtre de réponse à un bip : de `from` à `from+dur` (temps de séance, s)
+  openTaps(from,dur,thr){this.tapWin={from,to:from+dur,thr,taps:[],up:false,last:-9,max:0,mv:0,closed:false};}
   /* résultat d'une calibration faite avant la séance (tracker de calibration → tracker de séance) */
   calibResult(){
     const hrv=this.hrS.filter((x,i)=>i%4===0).map(x=>x[1]); // la calibration relève le cœur 4 fois par seconde
@@ -2082,6 +2123,11 @@ function drawTrack(g,w,h,d){
     g.fillStyle=rgba(c.startsWith('#')?c:'#a293ff',0.18+0.2*pulse);g.beginPath();g.arc(x,y,9+4*pulse,0,Math.PI*2);g.fill();
     g.fillStyle=c;g.beginPath();g.arc(x,y,mini?3:5.5,0,Math.PI*2);g.fill();
   }else if(d.now!=null&&!mini&&d.live){g.fillStyle=muted;g.textAlign='center';g.fillText(d.now<(d.calib??CALIB)?`Calibration, reste immobile… ${Math.max(0,Math.ceil((d.calib??CALIB)-d.now))} s`:'En attente des capteurs…',L+pw/2,T+ph/2);}
+  // bips d'entraînement : la réponse (nombre de tapes) en bas du graphique
+  if(!mini&&d.probes)for(const p of d.probes){const x=X(p.t),y=T+ph-11,lab=p.ans==null?'–':String(p.ans);
+    g.lineWidth=1.5;g.beginPath();g.arc(x,y,8,0,Math.PI*2);
+    if(p.ans>0){g.fillStyle=acc;g.fill();g.fillStyle=cssVar('--accent-ink')||'#12132a';}else{g.fillStyle=cssVar('--bg')||'#12132a';g.fill();g.strokeStyle=acc;g.stroke();g.fillStyle=text;}
+    g.textAlign='center';g.textBaseline='middle';g.font=`700 10px Figtree, system-ui, sans-serif`;g.fillText(lab,x,y+0.5);g.font=`11px Figtree, system-ui, sans-serif`;}
   // ressenti noté après coup
   if(!mini)for(const m of d.marks||[]){const x=X(m.t);g.strokeStyle=text;g.globalAlpha=0.7;g.setLineDash([3,3]);g.lineWidth=1;g.beginPath();g.moveTo(x,T);g.lineTo(x,T+ph);g.stroke();g.setLineDash([]);g.globalAlpha=1;
     const lab=MARKS[m.k]||'?',tw=g.measureText(lab).width+10,bx=clamp(x-tw/2,L,L+pw-tw);g.fillStyle=text;g.beginPath();g.roundRect?g.roundRect(bx,2,tw,17,8):g.rect(bx,2,tw,17);g.fill();g.fillStyle=cssVar('--bg')||'#12132a';g.textAlign='center';g.fillText(lab,bx+tw/2,11);}
@@ -2361,6 +2407,7 @@ function summaryText(r){
     else L.push('Cardio : pas assez de données');
   }
   if(r.track)L.push(...trackText(r));
+  if(r.training)L.push(...probeText(r));
   if(r.note&&r.note.trim())L.push(`Ressenti : ${r.note.trim()}`);
   return L.join('\n');
 }
@@ -2807,20 +2854,24 @@ async function startSession(){
   if(starting||session||performance.now()<startBlockedUntil)return;
   starting=true;try{await startSessionInner();}finally{starting=false;}
 }
+let trainReq=null;
 async function startSessionInner(){
-  if(!settings.sequence.some(x=>x.type!=='silence'))return showMsg('Le déroulé ne contient que du silence : ajoute au moins une stase, une montée ou un EV.');
+  const tr=trainReq;trainReq=null;Probe.on=false;
+  if(!tr&&!settings.sequence.some(x=>x.type!=='silence'))return showMsg('Le déroulé ne contient que du silence : ajoute au moins une stase, une montée ou un EV.');
   try{await engine.init(settings.background&&!window.VibrostaseNative,settings.light);}catch(e){return showMsg(e.message);}
   await decodeSamples();engine.setVolume(settings.volume);engine.setOutput(settings.output);
   if(settings.seedMode==='fixed'&&codeToSeed(settings.seedCode)==null)return showMsg('Code de graine invalide : lettres et chiffres uniquement, 7 caractères maximum.');
   if(settings.hr.source==='ble'&&!hr.connected)showMsg('Montre non connectée : la séance démarre sans cardio.');
   engine.watchInterruptions(st=>{const b=$('#runBuf');if(!session)return;if(st==='running'){b.dataset.int='';return;}
     b.hidden=false;b.dataset.int='1';b.textContent='Son interrompu par le téléphone. Touche l\'écran pour reprendre.';});
-  session=new Session({engine,hr,samples:effSamples(),settings:clone(settings),
+  // entraînement : silence (et musique de fond) pendant toute la durée, sans déroulé adaptatif
+  const sset=clone(settings);if(tr){sset.sequence=[S('silence',tr.min)];sset.track.adaptive=false;}
+  session=new Session({engine,hr,samples:effSamples(),settings:sset,
     onEvent:ev=>{if(!reduced||rings.length<20)rings.push({t0:performance.now(),pan:ev.pan,d:ev.distance,y:0.15+Math.random()*0.7});if(settings.showEvents)$('#runEv').textContent=ev.label;},
     onTick:uiTick,onEnd,onError:err=>showMsg('Erreur de calcul du son : '+(err&&err.message||err))});
   const trk=!!settings.track.enabled;
   $('#vizSeg').hidden=!trk;$('#runState').hidden=!trk;$('#runState').textContent='';setRunView(trk?(Store.get('runView','graph')):'body');
-  renderTimeline($('#tlRun'),settings.sequence);$('#tlRun .marker').hidden=false;
+  renderTimeline($('#tlRun'),sset.sequence);$('#tlRun .marker').hidden=false;
   $('#runEv').textContent=settings.showEvents?'–':'masqué';
   go('run');showRunCtl(8000);
   if('mediaSession' in navigator){try{navigator.mediaSession.metadata=new MediaMetadata({title:'Vibralia',artist:'Séance en cours'});}catch(e){}}
@@ -2834,6 +2885,7 @@ async function startSessionInner(){
     cal=await preflight();
     if(cal===false){abortStart();return;}
   }
+  if(tr)Probe.begin(tr,cal?0:CALIB);
   if(trk)trackStart(cal);
   if(Music.preview)Music.togglePreview();
   session.start();Music.start();
@@ -2843,7 +2895,8 @@ let lastUi=0;
 function uiTick(v){
   const now=performance.now();if(now-lastUi<250)return;lastUi=now;Music.update(v);
   let label=`${SEG_TYPES[v.type].label}`;if(v.type==='ev'&&v.ev){label+=v.ev.style==='focus'?(settings.showEvents&&v.ev.fam?` : ${famById(v.ev.fam).label.toLowerCase()}`:' concentré'):' : cacophonie';}
-  if(v.n>1)label+=` · ${v.idx+1}/${v.n}`;if(v.hold)label+=v.holdKind==='ev'?', prolongé (activation)':', en attente de détente';
+  if(v.n>1)label+=` · ${v.idx+1}/${v.n}`;
+  if(Probe.on)label=Probe.pending?'Bip : réponds par des tapes':'Entraînement · sommeil';if(v.hold)label+=v.holdKind==='ev'?', prolongé (activation)':', en attente de détente';
   if(tracker)$('#runState').innerHTML=liveStateText();
   $('#runPhase').textContent=label;
   $('#runTime').textContent=`${fmtTime(v.played)} / ${fmtTime(v.total)}`;
@@ -2857,6 +2910,7 @@ function onEnd(rec){
   Music.stop(rec.completed?3000:1200);
   // signal de fin : le service Android reste actif le temps qu'il se joue, écran éteint compris
   const wait=rec.completed?endSignal():0;
+  if(Probe.on)Probe.finish(rec);
   releaseWake();setTimeout(()=>{if(!session&&window.VibrostaseNative)try{window.VibrostaseNative.sessionState(false,false);}catch(e){}},wait);cancelAnimationFrame(rafId);
   trackStop(rec);
   lastRecord=rec;saveHistory(h=>{h.unshift(rec);return h;});
@@ -2974,9 +3028,10 @@ function getBodyLayer(w,h,dpr,top,H){
 }
 /* historique */
 let cmpMode=false;
-function recLabel(r){const k=seqKey(sanitizeSeq((r.settings&&r.settings.sequence)||[]));const p=BUILTIN_PRESETS.find(x=>seqKey(x.seq)===k);if(p)return p.label;const u=Store.get('sequences',{})||{};for(const n of Object.keys(u))if(seqKey(u[n])===k)return n;return 'Déroulé personnalisé';}
+function recLabel(r){if(r.training)return 'Entraînement · sommeil';const k=seqKey(sanitizeSeq((r.settings&&r.settings.sequence)||[]));const p=BUILTIN_PRESETS.find(x=>seqKey(x.seq)===k);if(p)return p.label;const u=Store.get('sequences',{})||{};for(const n of Object.keys(u))if(seqKey(u[n])===k)return n;return 'Déroulé personnalisé';}
 function recBadges(r){
   const out=[];let st=null;try{st=r.track?trackStats(r):null;}catch(e){}
+  if(r.training){const ps=r.training.probes||[],a=probeAgreement(ps);out.push(['Entraînement','w']);out.push([`Bips ×${ps.length}`]);if(a.n)out.push([`Accord ${a.pct} %`]);if(st&&st.sleep!=null)out.push([`Endormi ${fmtTime(st.sleep)}`]);return out;}
   if(st&&st.known){out.push([st.stase!=null?`Immobile ${fmtTime(st.stase)}`:'Jamais immobile']);if(st.sleep!=null)out.push([`Endormi ${fmtTime(st.sleep)}`]);if(st.ev.length)out.push([`Activation ×${st.ev.length}`]);}
   for(const k of [...new Set((r.marks||[]).map(m=>m.k))])out.push([`${MARKS[k]} noté`,'w']);
   return out;
@@ -2989,8 +3044,9 @@ function replayRec(r){
 function renderHistory(){
   const ul=$('#histList'),hist=Store.get('history',[])||[];ul.innerHTML='';
   for(const id of [...cmpSel])if(!hist.some(r=>r.id===id))cmpSel.delete(id);updateCmpRow();
-  const noted=hist.filter(r=>(r.marks||[]).some(m=>m.k==='ev'||m.k==='sortie')).length;
-  $('#jCount').textContent=hist.length?`${hist.length} séance${hist.length>1?'s':''}${noted?` · ${noted} avec EV ou sortie notés`:''}`:'';
+  const normal=hist.filter(r=>!r.training),nTr=hist.length-normal.length;
+  const noted=normal.filter(r=>(r.marks||[]).some(m=>m.k==='ev'||m.k==='sortie')).length;
+  $('#jCount').textContent=hist.length?`${normal.length} séance${normal.length>1?'s':''}${noted?` · ${noted} avec EV ou sortie notés`:''}${nTr?` · ${nTr} entraînement${nTr>1?'s':''}`:''}`:'';
   $('#btnCmpMode').hidden=!hist.length;$('#btnCmpMode').setAttribute('aria-pressed',String(cmpMode));$('#btnCmpMode').textContent=cmpMode?'Terminer':'Sélectionner';
   if(!hist.length){ul.append(el('li',{class:'empty',text:'Aucune séance pour l\'instant. Lance-en une depuis l\'onglet Séance.'}));return;}
   for(const r of hist){
@@ -3078,7 +3134,7 @@ function trackStart(cal){
   session.adapt=()=>{
     if(!tracker)return null;
     // endormi : l'attente cardio n'a plus de raison de retenir la détente, même sans le déroulé adaptatif
-    const asleep=tracker.asleepFor>0,on=settings.track.adaptive;
+    const asleep=tracker.asleepFor>0,on=settings.track.adaptive&&!Probe.on;
     // immobile depuis 3 min : l'état visé est atteint, inutile d'attendre encore le cœur
     const still=tracker.state===ST.stase&&tracker.info&&tracker.info.imm!=null&&tracker.info.imm>=180;
     return {asleep,still,skip:on&&tracker.asleepFor>=settings.track.sleepSkip*60,hold:on&&tracker.evRecent,maxHold:settings.track.evHold*60};
@@ -3091,6 +3147,7 @@ function trackStart(cal){
     const n=tracker.samples.length;
     tracker.update(v.played,d,hrv,v.type);
     if(tracker.samples.length!==n)graphDirty=true;
+    if(Probe.on)Probe.tick(v.played);
   },1000);
 }
 function trackStop(rec){
@@ -3140,7 +3197,7 @@ function drawSumGraph(){
   const {g,w,h}=sizeCanvas($('#sumGraph'));
   const MA=markAnim,k=MA?(performance.now()-MA.t0)/1000:0,sm=trackSamples(r.track),tmx=Math.max(r.actualSec||0,60);
   let pluck=null;if(MA&&k<.9&&graphGeom){pluck={x:graphGeom.X(MA.m.t),A:7*Math.pow(1-k/.9,2),s:k};}
-  graphGeom=drawTrack(g,w,h,{samples:sm,tmax:tmx,steps:r.steps,plannedSeq:null,jerks:r.track.jerks,noise:r.track.noise,marks:MA&&k<.95?(r.marks||[]).filter(x=>x!==MA.m):(r.marks||[]),clock:clockMode?r.startedAt:null,pluck});
+  graphGeom=drawTrack(g,w,h,{samples:sm,tmax:tmx,steps:r.steps,plannedSeq:null,jerks:r.track.jerks,noise:r.track.noise,marks:MA&&k<.95?(r.marks||[]).filter(x=>x!==MA.m):(r.marks||[]),clock:clockMode?r.startedAt:null,pluck,probes:r.training&&r.training.probes});
   if(MA&&k<.95){ // trait qui se dessine de haut en bas + halo sur la courbe
     const G=graphGeom,x=G.X(MA.m.t),acc=cssVar('--accent')||'#a293ff',p=Math.min(1,k/.5),q=clamp((k-.25)/.7,0,1);
     let st=null;for(const s of sm){if(s.t>MA.m.t)break;if(s.st>=0)st=s.st;}
@@ -3174,6 +3231,9 @@ function renderSumCards(r){
   const box=$('#sumCards');box.innerHTML='';let st=null;try{st=r.track?trackStats(r):null;}catch(e){}
   const hv=r.track?trackSamples(r.track).map(x=>x.hr).filter(Boolean):[];
   const cards=[];
+  if(r.training){const ps=r.training.probes||[],a=probeAgreement(ps);
+    cards.push(['Endormi (estimé)',st&&st.sleep!=null?fmtTime(st.sleep):'–']);cards.push(['Bips',String(ps.length)]);cards.push(['Sans réponse',String(ps.filter(p=>p.ans===0).length)]);cards.push(['Accord',a.n?a.pct+' %':'–']);
+    for(const [k,v] of cards)box.append(el('div',{class:'kcard'},[el('span',{text:k}),el('b',{text:v})]));return;}
   if(st&&st.known){cards.push(['Immobile',st.stase!=null?fmtTime(st.stase):'–']);cards.push(['Endormi',st.sleep!=null?fmtTime(st.sleep):'–']);cards.push(['Activations',String(st.ev.length)]);}
   cards.push(['Cœur',hv.length?`${Math.min(...hv)}–${Math.max(...hv)}`:(r.hr&&r.hr.min?`${r.hr.min}–${r.hr.max}`:'–')]);
   if(!st||!st.known){cards.push(['Durée',fmtTime(r.actualSec)]);cards.push(['Sons',String(r.eventTotal||0)]);}
@@ -3318,6 +3378,13 @@ function chime(kind){
       g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.5,t+0.008);g.gain.exponentialRampToValueAtTime(0.0001,t+1.1);o.connect(lp);lp.connect(g);g.connect(out);o.start(t);o.stop(t+1.2);};
     for(const r of [0,1.9])[[783.99,0],[659.25,0.26],[523.25,0.52]].forEach(([f,d])=>pluck(f,t0+r+d));
   }
+  else if(kind==='probe'){
+    // bip d'entraînement : trois notes courtes et claires qui montent (timbre de lame, absent du reste de l'appli)
+    out.gain.value=0.9*clamp(settings.train.vol,0.05,1);
+    const bar=(f,t)=>{for(const [m,a,d] of [[1,1,0.32],[3.93,0.22,0.09]]){const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=f*m;
+      g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.5*a,t+0.006);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(out);o.start(t);o.stop(t+d+0.05);}};
+    [[880,0],[1108.73,0.16],[1318.51,0.32]].forEach(([f,d])=>bar(f,t0+d));
+  }
   else note(392,t0,3.2,0.45);                                                   // une note de bol : « c'est parti »
   setTimeout(()=>{try{out.disconnect();}catch(e){}},5000);
 }
@@ -3402,7 +3469,7 @@ function preflight(){
   });
 }
 function abortStart(){
-  Music.stop(300);
+  Music.stop(300);Probe.on=false;
   startBlockedUntil=performance.now()+1500;
   releaseWake();if(window.VibrostaseNative)try{window.VibrostaseNative.sessionState(false,false);}catch(e){}
   PhoneSensors.stop();cancelAnimationFrame(rafId);session=null;
@@ -3422,6 +3489,7 @@ function go(v){
   $('#tabbar').hidden=!tab;document.body.classList.toggle('with-tabs',tab);document.body.classList.toggle('running',v==='run');
   document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===v?'page':'false'));
   if(v==='journal')renderHistory();
+  if(v==='page-train')renderTrain();
   if(v==='setup')(window.requestAnimationFrame||setTimeout)(drawEmblem);
   window.scrollTo(0,0);
 }
@@ -3747,7 +3815,7 @@ const Music={el:null,url:null,cur:null,timer:0,level:0,target:0,preview:false,
     try{await a.play();}catch(e){return;}this.loop();
   },
   // appelé à chaque mise à jour de la séance : baisse pendant l'EV si demandé
-  update(v){if(!this.el||this.el.paused||this.preview)return;const d=settings.music.duck&&v&&v.type==='ev'?0.25:1;this.target=this.vol()*d;},
+  update(v){if(!this.el||this.el.paused||this.preview)return;const d=settings.music.duck&&v&&v.type==='ev'?0.25:1;this.target=this.vol()*d*(performance.now()<Probe.duckUntil?0.3:1);},
   stop(fade=2500){
     const a=this.el;if(!a||a.paused){clearInterval(this.timer);return;}this.target=0;const step=0.25*100/Math.max(100,fade);
     clearInterval(this.timer);this.timer=setInterval(()=>{this.level=Math.max(0,this.level-Math.max(step,this.level*step*4));a.volume=this.level;if(this.level<=0.005){clearInterval(this.timer);a.pause();}},100);
@@ -3787,6 +3855,117 @@ $('#btnMusicPlay').addEventListener('click',()=>Music.togglePreview());
 $('#btnMusicDel').addEventListener('click',async()=>{if(!confirmTap($('#btnMusicDel'),'Confirmer'))return;if(Music.preview)Music.togglePreview();settings.music.id=null;saveSettings();await pruneMusic();renderMusic();});
 document.querySelector('[data-sec=music]').addEventListener('toggle',e=>{if(!e.target.open&&Music.preview)Music.togglePreview();});
 renderMusic();pruneMusic();
+
+/* ===== entraînement de la détection : séance Sommeil avec bips et réponses par tapes ===== */
+const TAP_BASE={low:1.2,mid:0.7,high:0.4};
+const tapThr=tk=>Math.max(TAP_BASE[settings.train.sens]||0.7,(tk?tk.thrMove:0.08)*4);
+const PROBE_WHY={onset:'endormissement estimé',random:'au hasard',confirm:'confirmation'};
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const Probe={on:false,list:[],pending:null,duckUntil:0,
+  begin(tr,calib){Object.assign(this,{on:true,kind:tr.kind||'sleep',list:[],pending:null,lastT:-1e9,quietUntil:0,confirmAt:null,prevSleep:false,onsetAt:null,next:calib+rnd(480,720),minT:calib+180});},
+  tick(t){
+    if(!this.on||!tracker)return;
+    if(this.pending){if(t>=this.pending.end+2)this.close();return;}
+    const sl=SLEEPING(tracker.state);
+    if(sl&&!this.prevSleep)this.onsetAt=t;if(!sl)this.onsetAt=null;this.prevSleep=sl;
+    if(t<this.minT||t<this.quietUntil)return;
+    const gap=t-this.lastT;let why=null;
+    if(this.confirmAt!=null&&t>=this.confirmAt)why='confirm';
+    else if(this.onsetAt!=null&&t-this.onsetAt>=30&&gap>=240){why='onset';this.onsetAt=null;}
+    else if(t>=this.next&&gap>=240)why='random';
+    if(why)this.fire(t,why);
+  },
+  fire(t,why){
+    this.duckUntil=performance.now()+2200;Music.update(session&&session.view());
+    setTimeout(()=>chime('probe'),300);
+    const start=t+1.0,i=tracker.info||{},h=i.hr;
+    tracker.openTaps(start,10,tapThr(tracker));
+    this.pending={t:Math.round(t*10)/10,why,st:tracker.state,imm:i.imm==null||!Number.isFinite(i.imm)?null:Math.round(i.imm),drop:h&&Number.isFinite(h.drop)?Math.round(h.drop*10)/10:null,start,end:start+10};
+    graphDirty=true;
+  },
+  close(){
+    const p=this.pending,W=tracker&&tracker.tapWin;this.pending=null;if(!p)return;
+    let n=0,lat=null,max=0,mv=0;if(W){W.closed=true;n=W.taps.length;lat=n?Math.round((W.taps[0]-p.start)*10)/10:null;max=W.max;mv=W.mv;}
+    const moved=n>6||mv>=5;
+    const ans=moved?null:Math.min(3,n);
+    const rec={t:p.t,why:p.why,st:p.st,ans,n,lat,imm:p.imm,drop:p.drop,pk:Math.round(max*100),thr:W?Math.round(W.thr*100):null};if(moved)rec.moved=1;
+    this.list.push(rec);
+    this.lastT=p.t;this.next=p.t+rnd(360,600);
+    if(ans===0){if(p.why!=='confirm')this.confirmAt=p.t+120;else{this.confirmAt=null;this.quietUntil=p.t+1200;this.next=Math.max(this.next,this.quietUntil+rnd(0,240));}}
+    else this.confirmAt=null;
+    graphDirty=true;
+  },
+  finish(rec){
+    if(this.pending)this.close();
+    rec.training={kind:this.kind,v:1,probes:this.list.slice(),sens:settings.train.sens,vol:settings.train.vol};
+    this.on=false;
+  }
+};
+// accord : l'appli estimait « endormi » et tu ne répondais plus, ou « éveillé » et tu répondais
+function probeAgree(p){if(p.ans==null||p.st==null||p.st<0)return null;return SLEEPING(p.st)?p.ans===0:p.ans>=1;}
+function probeAgreement(ps){let n=0,ok=0,fs=0,fw=0;for(const p of ps){const a=probeAgree(p);if(a==null)continue;n++;if(a)ok++;else if(SLEEPING(p.st))fs++;else fw++;}return {n,ok,pct:n?Math.round(100*ok/n):0,falseSleep:fs,falseWake:fw};}
+const ANS_TXT=['aucune réponse','1 tape (liminal)','2 tapes (détendu)','3 tapes (conscient)'];
+function probeText(r){
+  const ps=r.training.probes||[],L=[`Entraînement sommeil : ${ps.length} bip${ps.length>1?'s':''}`];
+  for(const p of ps){const est=p.st>=0?STATES[p.st].label.toLowerCase():'inconnu';
+    L.push(`  ${fmtTime(p.t)} (${clockAt(r.startedAt,p.t)}) bip ${PROBE_WHY[p.why]||p.why} : ${p.ans==null?'mouvement, réponse illisible':ANS_TXT[p.ans]}${p.lat!=null?`, en ${fmtNum(p.lat)} s`:''} ; l'appli estimait : ${est}`);}
+  const a=probeAgreement(ps);if(a.n)L.push(`  accord avec l'estimation : ${a.pct} % (${a.ok} sur ${a.n})`);
+  return L;
+}
+function renderTrain(){
+  const hist=(Store.get('history',[])||[]).filter(r=>r.training),ps=hist.flatMap(r=>r.training.probes||[]),box=$('#trainStats');box.innerHTML='';
+  const P=t=>{const q=el('p');q.innerHTML=t;box.append(q);};
+  if(!ps.length){P('Aucune réponse pour l\'instant. Les résultats de tes séances d\'entraînement apparaîtront ici.');}
+  else{
+    const c=[0,1,2,3].map(k=>ps.filter(p=>p.ans===k).length),a=probeAgreement(ps);
+    P(`<b>${hist.length}</b> séance${hist.length>1?'s':''} d'entraînement · <b>${ps.length}</b> bip${ps.length>1?'s':''}`);
+    P(`Réponses : 3 tapes ×${c[3]} · 2 ×${c[2]} · 1 ×${c[1]} · aucune ×${c[0]}${ps.some(p=>p.ans==null)?` · illisibles ×${ps.filter(p=>p.ans==null).length}`:''}`);
+    if(a.n){P(`Accord avec l'estimation : <b>${a.pct} %</b> (${a.ok} sur ${a.n})`);
+      P(`L'appli te croyait endormi alors que tu répondais : ${a.falseSleep} fois`);
+      P(`L'appli te croyait éveillé alors que tu ne répondais plus : ${a.falseWake} fois`);}
+  }
+  const ans=ps.filter(p=>p.ans!=null).length;
+  P(`Détection utilisée : <b>modèle commun</b>. La détection personnalisée s'appuiera sur ces réponses, à partir d'une trentaine (${Math.min(ans,30)}/30).`);
+  $('#sumTrain').textContent=ps.length?`${ps.length} réponse${ps.length>1?'s':''}`:'Séance Sommeil';
+}
+function startTraining(){
+  if(session||starting)return;
+  if(!settings.track.enabled||settings.track.position==='none')return showMsg('Active le suivi du corps avec le téléphone près de toi (Réglages › Suivi du corps) : les tapes passent par le téléphone.');
+  trainReq={kind:'sleep',min:clamp(settings.train.min|0,15,120)};startSession();
+}
+const TapTest={busy:false,
+  async run(){
+    if(this.busy||session||starting)return;this.busy=true;
+    const b=$('#btnProbeTest'),msg=$('#probeTestMsg'),box=$('#probeTest'),cnt=$('#tapCount'),nat=window.VibrostaseNative,wait=ms=>new Promise(r=>setTimeout(r,ms));
+    b.disabled=true;$('#btnTrainStart').disabled=true;
+    try{
+      try{await engine.init(settings.background&&!nat,settings.light);}catch(e){msg.textContent=e.message;return;}
+      engine.setVolume(settings.volume);engine.setOutput(settings.output);askMotion();
+      if(nat&&nat.tapTest){try{nat.tapTest(true);}catch(e){}}else await PhoneSensors.start({accel:true,mic:false});
+      const tk=new BodyTracker({position:settings.track.position,calib:0});let c0=null,P=0;
+      const feed=()=>{const d=PhoneSensors.poll();if(!d.clockNow)return;if(c0==null)c0=d.clockNow-3000;P=(d.clockNow-c0)/1000;tk.update(P,d,null,'silence');};
+      const it=setInterval(feed,200);
+      box.hidden=false;cnt.textContent='…';msg.textContent='Ne bouge plus. Le bip arrive dans 3 secondes.';
+      await wait(3000);feed();
+      chime('probe');tk.openTaps(P+0.4,10,tapThr(null));
+      msg.textContent='Tape maintenant, du bout du doigt, sur le téléphone.';
+      const t0=performance.now();
+      while(performance.now()-t0<11500){cnt.textContent=String(tk.tapWin.taps.length);await wait(200);}
+      feed();clearInterval(it);
+      const n=tk.tapWin.taps.length;cnt.textContent=String(n);
+      if(!tk.src.acc)msg.textContent='Aucune mesure de mouvement reçue : l\'accéléromètre ne répond pas ici.';
+      else if(!n)msg.textContent='Aucune tape détectée. Tape plus franchement, ou passe la sensibilité sur « Forte ».';
+      else if(n>3)msg.textContent=`${n} tapes détectées. Plus de 3 : espace un peu tes tapes, ou baisse la sensibilité.`;
+      else msg.textContent=`${n} tape${n>1?'s':''} détectée${n>1?'s':''}. Si c'est bien ce que tu as fait, c'est réglé.`;
+    }finally{
+      try{if(nat&&nat.tapTest)nat.tapTest(false);else PhoneSensors.stop();}catch(e){}
+      b.disabled=false;$('#btnTrainStart').disabled=false;this.busy=false;
+    }
+  }
+};
+$('#btnProbeTest').addEventListener('click',()=>TapTest.run());
+$('#btnTrainStart').addEventListener('click',startTraining);
+renderTrain();
 
 /* ===== écran de lancement : le cercle se trace, le V tombe, le liquide monte et l'immerge ===== */
 (function(){
