@@ -232,6 +232,8 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 .tapcount{font-size:2.4rem;font-weight:700;text-align:center;margin:.2em 0;color:var(--accent)}
 .anslist{margin:.4em 0 .6em;padding-left:1.1em}
 .anslist li{margin:.2em 0}
+#splash .ver{position:absolute;right:16px;bottom:calc(14px + env(safe-area-inset-bottom));font:500 12px/1 Figtree,system-ui,sans-serif;color:#8b88b8;letter-spacing:.02em}
+.appver{text-align:center;font-size:.8rem;color:var(--muted);margin:1.4em 0 .4em}
 #splash{position:fixed;inset:0;z-index:100;background:#12132a;display:grid;place-items:center;transition:opacity .35s ease,transform .35s ease}
 html.splashing,html.splashing body{overflow:hidden}
 html.splashing::-webkit-scrollbar{display:none}
@@ -385,10 +387,10 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 </style>
 </head>
 <body>
-<script>document.documentElement.classList.add('splashing')</script><div id="splash" aria-hidden="true"><svg viewBox="0 0 108 108"><defs><linearGradient id="sp-l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9D6FF"/><stop offset="1" stop-color="#A293FF"/></linearGradient><clipPath id="sp-c"><circle cx="54" cy="56" r="27"/></clipPath><clipPath id="sp-s"><path id="sp-sea2" d="M0,200Z"/></clipPath></defs>
+<script>document.documentElement.classList.add('splashing');try{window.VibrostaseNative&&window.VibrostaseNative.scrollbars&&window.VibrostaseNative.scrollbars(false);}catch(e){}</script><div id="splash" aria-hidden="true"><svg viewBox="0 0 108 108"><defs><linearGradient id="sp-l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9D6FF"/><stop offset="1" stop-color="#A293FF"/></linearGradient><clipPath id="sp-c"><circle cx="54" cy="56" r="27"/></clipPath><clipPath id="sp-s"><path id="sp-sea2" d="M0,200Z"/></clipPath></defs>
 <circle id="sp-ring" cx="54" cy="56" r="27" fill="none" stroke="#D9D6FF" stroke-width="4" stroke-linecap="round" transform="rotate(-90 54 56)" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
 <g clip-path="url(#sp-c)"><path id="sp-sea" d="M0,200Z" fill="url(#sp-l)"/></g>
-<g id="sp-v"><path d="M41,41 L54,70 L67,41" stroke="#D9D6FF" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><g clip-path="url(#sp-s)"><path d="M41,41 L54,70 L67,41" stroke="#0F1030" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg></div>
+<g id="sp-v"><path d="M41,41 L54,70 L67,41" stroke="#D9D6FF" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><g clip-path="url(#sp-s)"><path d="M41,41 L54,70 L67,41" stroke="#0F1030" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg><span class="ver" id="splashVer"></span></div>
 <audio id="bgAudio" playsinline></audio>
 <main>
   <!-- ============ SÉANCE (accueil) ============ -->
@@ -444,6 +446,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
     <div class="group-card"><button class="item" data-open="help"><span class="it-t">Guide et vidéo</span><span class="sum">Comment utiliser Vibralia</span></button></div>
     <p class="grp">Données</p>
     <div class="group-card"><button class="item" data-open="backup"><span class="it-t">Sauvegarde</span><span class="sum">Exporter, restaurer</span></button><button class="item" data-open="analysis"><span class="it-t">Données d'analyse</span><span class="sum" id="sumAna">Contribuer</span></button></div>
+    <p class="appver" id="appVer"></p>
   </section>
 
   <section class="subpage" id="page-seq" hidden>
@@ -3627,7 +3630,7 @@ function anSave(p){Store.set('analysis',p);}
 const anUseful=r=>(r.actualSec|0)>=120&&!(r.hr&&r.hr.source==='sim')&&!(r.settings&&r.settings.hr&&r.settings.hr.source==='sim');
 const fmtSize=b=>b<1048576?Math.max(1,Math.round(b/1024))+' Ko':(b/1048576).toFixed(1)+' Mo';
 // adresse du script de réception (Google Apps Script). Vide : envoi automatique indisponible, export manuel seulement.
-const ANALYSIS_ENDPOINT='',ANALYSIS_KEY='vbs-ana-1',AN_MANUAL=10,AN_BATCH=10;
+const ANALYSIS_ENDPOINT='https://script.google.com/macros/s/AKfycbzJeeRSS2R3G-km75KdY26X1IGEitQgImsGuazQUfr4Dqcxt0xFzKRVeYEvMrNkHRqA/exec',ANALYSIS_KEY='vbs-ana-1',AN_MANUAL=10,AN_BATCH=10;
 // dans claude.ai la page ne peut joindre aucun site extérieur : export manuel seulement
 const anAutoPossible=()=>!window.claude&&/^https:\/\/script\.google\.com\//.test(ANALYSIS_ENDPOINT);
 const AN_INFO="Ces données servent uniquement à rendre la détection plus précise : EV, détente, endormissement, réveils, réactions aux sons. Elles sont anonymes : un identifiant tiré au hasard, rien sur toi, rien de ce qui se passe hors des séances. Contenu : mouvements du téléphone, cœur, respiration, volume sonore (jamais d'enregistrement du micro), déroulé, repères notés, date et heure de chaque séance, et ton profil court. Elles sont reçues par le créateur de Vibralia et supprimées sur simple demande avec ton identifiant.";
@@ -3709,7 +3712,7 @@ async function buildAnalysis(list,fromCard){
     if(a){x.raw=a.raw||null;x.events=a.events||[];}
     sessions.push(x);
   }
-  const data={app:'vibrostase-analyse',format:1,appVersion:APP_VERSION,exportedAt:new Date().toISOString(),tzOffsetMin:-new Date().getTimezoneOffset(),
+  const data={app:'vibrostase-analyse',format:1,appVersion:APP_VERSION,build:BUILD_VERSION,exportedAt:new Date().toISOString(),tzOffsetMin:-new Date().getTimezoneOffset(),
     participant:p.pid,profile:{shc:p.shc||null,evf:p.evf||null,age:p.age||null,watch:p.watch||null},device:anDevice(),
     legend:{st:ST,blocks:BLOCKS,marks:MARKS,trackDt:TRACK_DT,units:{mv:'mouvement RMS ×1000 (m/s², au-dessus de ~0,6 Hz)',pk:'pic de mouvement ×1000',nz:'volume micro dB (max par seconde)',hr:'bpm',br:'bande lente de l\'accéléromètre ×10000, 2 Hz',diag:'toutes les 5 s : immobilité (s), respiration (/min, variabilité), baisse et saut cardio (bpm), activation, seuil de mouvement ×1000, fond sonore dB'}},
     sessions};
@@ -3967,10 +3970,15 @@ $('#btnProbeTest').addEventListener('click',()=>TapTest.run());
 $('#btnTrainStart').addEventListener('click',startTraining);
 renderTrain();
 
+/* ===== numéro de version : celui de l'APK (Android) ou celui de la publication web ; c'est le même que sur GitHub (v1.0.N) ===== */
+const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.43';})();
+function nativeScrollbars(){try{const n=window.VibrostaseNative;if(n&&n.scrollbars)n.scrollbars(true);}catch(e){}}
+if(BUILD_VERSION&&!BUILD_VERSION.startsWith('__')){const t='v'+BUILD_VERSION;const a=$('#splashVer');if(a)a.textContent=t;const b=$('#appVer');if(b)b.textContent=`Vibralia ${t}${window.VibrostaseNative?' · Android':' · web'}`;}
+
 /* ===== écran de lancement : le cercle se trace, le V tombe, le liquide monte et l'immerge ===== */
 (function(){
-  const sp=document.getElementById('splash');if(!sp){document.documentElement.classList.remove('splashing');return;}
-  const done=()=>{sp.classList.add('out');setTimeout(()=>{sp.remove();document.documentElement.classList.remove('splashing');},400);};
+  const sp=document.getElementById('splash');if(!sp){document.documentElement.classList.remove('splashing');nativeScrollbars();return;}
+  const done=()=>{sp.classList.add('out');setTimeout(()=>{sp.remove();document.documentElement.classList.remove('splashing');nativeScrollbars();},400);};
   if(reduced){document.getElementById('sp-ring').setAttribute('stroke-dashoffset','0');const d='M27,61L81,61L81,90L27,90Z';$('#sp-sea').setAttribute('d',d);$('#sp-sea2').setAttribute('d',d);setTimeout(done,500);return;}
   const ring=document.getElementById('sp-ring'),sea=document.getElementById('sp-sea'),sea2=document.getElementById('sp-sea2'),v=document.getElementById('sp-v');
   const E=t=>1-Math.pow(1-t,3),B=t=>{const c=1.6;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2);},seg=(t,a,b)=>clamp((t-a)/(b-a),0,1);
