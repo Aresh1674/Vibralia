@@ -228,6 +228,8 @@ input[type=range]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;bac
 #logoMark{width:52px;height:52px;flex:none;border-radius:24%;box-shadow:0 6px 18px rgba(0,0,0,.25)}
 /* écran de lancement : le V s'immerge */
 #splash{position:fixed;inset:0;z-index:100;background:#12132a;display:grid;place-items:center;transition:opacity .35s ease,transform .35s ease}
+html.splashing,html.splashing body{overflow:hidden}
+html.splashing::-webkit-scrollbar{display:none}
 #splash.out{opacity:0;transform:scale(1.04);pointer-events:none}
 #splash svg{width:min(42vw,190px);height:auto;overflow:visible}
 .status{display:inline-flex;align-items:center;gap:8px;border:0;background:none;padding:6px 0;min-height:36px;color:var(--muted);font-size:var(--fs-s);text-align:left}
@@ -378,7 +380,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 </style>
 </head>
 <body>
-<div id="splash" aria-hidden="true"><svg viewBox="0 0 108 108"><defs><linearGradient id="sp-l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9D6FF"/><stop offset="1" stop-color="#A293FF"/></linearGradient><clipPath id="sp-c"><circle cx="54" cy="56" r="27"/></clipPath><clipPath id="sp-s"><path id="sp-sea2" d="M0,200Z"/></clipPath></defs>
+<script>document.documentElement.classList.add('splashing')</script><div id="splash" aria-hidden="true"><svg viewBox="0 0 108 108"><defs><linearGradient id="sp-l" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D9D6FF"/><stop offset="1" stop-color="#A293FF"/></linearGradient><clipPath id="sp-c"><circle cx="54" cy="56" r="27"/></clipPath><clipPath id="sp-s"><path id="sp-sea2" d="M0,200Z"/></clipPath></defs>
 <circle id="sp-ring" cx="54" cy="56" r="27" fill="none" stroke="#D9D6FF" stroke-width="4" stroke-linecap="round" transform="rotate(-90 54 56)" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/>
 <g clip-path="url(#sp-c)"><path id="sp-sea" d="M0,200Z" fill="url(#sp-l)"/></g>
 <g id="sp-v"><path d="M41,41 L54,70 L67,41" stroke="#D9D6FF" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><g clip-path="url(#sp-s)"><path d="M41,41 L54,70 L67,41" stroke="#0F1030" stroke-width="6.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g></g></svg></div>
@@ -3557,7 +3559,7 @@ function anSave(p){Store.set('analysis',p);}
 const anUseful=r=>(r.actualSec|0)>=120&&!(r.hr&&r.hr.source==='sim')&&!(r.settings&&r.settings.hr&&r.settings.hr.source==='sim');
 const fmtSize=b=>b<1048576?Math.max(1,Math.round(b/1024))+' Ko':(b/1048576).toFixed(1)+' Mo';
 // adresse du script de réception (Google Apps Script). Vide : envoi automatique indisponible, export manuel seulement.
-const ANALYSIS_ENDPOINT='https://script.google.com/macros/s/AKfycbzJeeRSS2R3G-km75KdY26X1IGEitQgImsGuazQUfr4Dqcxt0xFzKRVeYEvMrNkHRqA/exec',ANALYSIS_KEY='vbs-ana-1',AN_MANUAL=10,AN_BATCH=10;
+const ANALYSIS_ENDPOINT='',ANALYSIS_KEY='vbs-ana-1',AN_MANUAL=10,AN_BATCH=10;
 // dans claude.ai la page ne peut joindre aucun site extérieur : export manuel seulement
 const anAutoPossible=()=>!window.claude&&/^https:\/\/script\.google\.com\//.test(ANALYSIS_ENDPOINT);
 const AN_INFO="Ces données servent uniquement à rendre la détection plus précise : EV, détente, endormissement, réveils, réactions aux sons. Elles sont anonymes : un identifiant tiré au hasard, rien sur toi, rien de ce qui se passe hors des séances. Contenu : mouvements du téléphone, cœur, respiration, volume sonore (jamais d'enregistrement du micro), déroulé, repères notés, date et heure de chaque séance, et ton profil court. Elles sont reçues par le créateur de Vibralia et supprimées sur simple demande avec ton identifiant.";
@@ -3788,8 +3790,8 @@ renderMusic();pruneMusic();
 
 /* ===== écran de lancement : le cercle se trace, le V tombe, le liquide monte et l'immerge ===== */
 (function(){
-  const sp=document.getElementById('splash');if(!sp)return;
-  const done=()=>{sp.classList.add('out');setTimeout(()=>sp.remove(),400);};
+  const sp=document.getElementById('splash');if(!sp){document.documentElement.classList.remove('splashing');return;}
+  const done=()=>{sp.classList.add('out');setTimeout(()=>{sp.remove();document.documentElement.classList.remove('splashing');},400);};
   if(reduced){document.getElementById('sp-ring').setAttribute('stroke-dashoffset','0');const d='M27,61L81,61L81,90L27,90Z';$('#sp-sea').setAttribute('d',d);$('#sp-sea2').setAttribute('d',d);setTimeout(done,500);return;}
   const ring=document.getElementById('sp-ring'),sea=document.getElementById('sp-sea'),sea2=document.getElementById('sp-sea2'),v=document.getElementById('sp-v');
   const E=t=>1-Math.pow(1-t,3),B=t=>{const c=1.6;return 1+(c+1)*Math.pow(t-1,3)+c*Math.pow(t-1,2);},seg=(t,a,b)=>clamp((t-a)/(b-a),0,1);
