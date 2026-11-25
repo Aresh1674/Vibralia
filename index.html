@@ -704,6 +704,8 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
       <div class="row"><button id="btnTrainStart" class="primary">Démarrer une séance Sommeil</button></div>
       <p class="grp">Ta détection</p>
       <div class="hint" id="trainStats"></div>
+      <label class="check" id="trPersonalRow" hidden><input type="checkbox" data-key="train.personal"> Utiliser ma détection personnalisée (sinon : réglages communs)</label>
+      <p class="hint">L'ajustement se refait seul après chaque séance d'entraînement, sur ton téléphone. Il vaut aussi pour tes séances normales.</p>
     </div>
   </section>
   <section class="subpage" id="page-help" hidden>
@@ -1031,7 +1033,7 @@ const DEFAULTS={
   pulseDepth:0.8, density:0.5, eventLevel:0.6, evDensity:0.7, evFocusChance:0.5, eerie:0.25,
   families:Object.fromEntries(FAMILIES.map(f=>[f.id,true])),
   music:{id:null,volume:0.35,duck:true}, // musique de fond (fichier dans IndexedDB)
-  train:{min:45,vol:0.6,sens:'mid',musicMode:'seq',musicId:null,musicVol:0.35}, // séances d'entraînement de la détection
+  train:{min:45,vol:0.6,sens:'mid',musicMode:'seq',musicId:null,musicVol:0.35,personal:true}, // séances d'entraînement de la détection
   mixSynth:{}, // familles où le son d'origine reste tiré au hasard avec les enregistrements importés
   showEvents:true,
   hr:{source:'none',waitCalm:true,calmDrop:5,maxWait:10,guard:true},
@@ -1828,6 +1830,14 @@ const STATES=[ // de haut en bas sur le graphique
 ];
 const ST={wake:0,relax:1,stase:2,ev:3,light:4,rem:5,deep:6};
 const SLEEPING=s=>s===ST.light||s===ST.rem||s===ST.deep;
+// seuils du passage en sommeil léger : valeurs communes ; la détection personnalisée les décale (Réglages › Entraînement)
+const DET_DEFAULT={shift:0,drop:5,cv:0.22};
+// prédiction « endormi » à partir des mesures relevées au moment d'un bip (même règle que _eval, sans l'inertie)
+function detPredict(f,K){
+  if(f.moving)return false;
+  const I=f.imm==null?Infinity:f.imm;
+  return (I>=480+K.shift||!f.haveAcc)&&(f.jerk||(f.drop!=null&&f.drop>=(f.haveAcc?K.drop:K.drop+2))||(f.drop==null&&f.cv!=null&&f.cv<K.cv&&f.rateOk&&I>=600+K.shift));
+}
 const MARKS={stase:'Stase',hypna:'Hypnagogie',ev:'EV',sortie:'Sortie',sleep:'Endormi',wake:'Réveil',other:'Autre'};
 const TRACK_DT=5,CALIB=30;
 const median=a=>{if(!a.length)return null;const b=[...a].sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2;};
@@ -1836,7 +1846,7 @@ const sdev=a=>{const m=mean(a);return a.length>1?Math.sqrt(a.reduce((s,x)=>s+(x-
 
 class BodyTracker{
   constructor(o){
-    this.o=Object.assign({position:'mattress',noise:false,calib:CALIB},o);this.calib=this.o.calib;
+    this.o=Object.assign({position:'mattress',noise:false,calib:CALIB},o);this.calib=this.o.calib;this.K=Object.assign({},DET_DEFAULT,this.o.K||{});
     this.prevT=null;this.f=null;this.bucket=null;this.brAcc=null;
     this.moveSec=[];this.brBuf=[];this.rates=[];this.hrS=[];
     this.calibMove=[];this.calibNoise=[];this.thrMove=0.08;this.jerkThr=0.45;this.noiseBase=null;
@@ -1963,13 +1973,16 @@ class BodyTracker{
       const act=(hrUp||brUp)&&!moving;
       const prev=this.state,sleeping=SLEEPING(prev);
       const drop=hrF?hrF.drop:null,jerkRecent=this.jerks.some(j=>t-j<600&&t-j>=60&&j>=this.lastMoveT);
-      const brCalm=br.rate!=null&&br.cv<0.22&&(brRef==null||br.rate<=brRef*1.02);
+      const K=this.K,rateOk=br.rate!=null&&(brRef==null||br.rate<=brRef*1.02);
+      const brCalm=br.rate!=null&&br.cv<K.cv&&rateOk;
+      // mesures brutes gardées pour les bips d'entraînement (elles ne dépendent pas des seuils)
+      this.feat={imm:imm==null||!Number.isFinite(imm)?null:Math.round(imm),drop:drop==null?null:Math.round(drop*10)/10,cv:br.cv==null?null:Math.round(br.cv*1000)/1000,rateOk,jerk:!!jerkRecent,haveAcc:!!haveAcc,moving:!!moving};
       // état de fond (sans l'activation)
       let base;
       if(moving)base=ST.wake;
       else{
         const I=imm??Infinity;
-        const light=(I>=480||!haveAcc)&&((jerkRecent)||(drop!=null&&drop>=(haveAcc?5:7))||(drop==null&&brCalm&&I>=600));
+        const light=(I>=480+K.shift||!haveAcc)&&((jerkRecent)||(drop!=null&&drop>=(haveAcc?K.drop:K.drop+2))||(drop==null&&brCalm&&I>=600+K.shift));
         if(sleeping&&this.base>=ST.light)base=this.base;                // on reste endormi tant que rien ne bouge
         else if(light)base=ST.light;
         else if((I>=180||!haveAcc)&&(drop==null?true:drop>=(haveAcc?-2:4)))base=ST.stase;
@@ -3155,7 +3168,7 @@ let tracker=null,trackTimer=null,graphDirty=true;
 function trackStart(cal){
   tracker=null;clearInterval(trackTimer);trackTimer=null;
   if(!settings.track.enabled)return;
-  tracker=new BodyTracker({position:settings.track.position,calib:cal?0:CALIB});
+  tracker=new BodyTracker({position:settings.track.position,calib:cal?0:CALIB,K:detParams().K});
   tracker.applyCalibration(cal);
   session.adapt=()=>{
     if(!tracker)return null;
@@ -3183,7 +3196,7 @@ function trackStop(rec){
     // dernières mesures avant de figer
     try{const d=PhoneSensors.poll();tracker.update(rec.actualSec,d,null,'silence');}catch(e){}
     try{Object.defineProperty(rec,'_raw',{value:tracker.exportRaw(rec.actualSec),enumerable:false});}catch(e){}
-    rec.track=tracker.export();rec.track.st=rec.track.st.slice(0,Math.floor(rec.actualSec/TRACK_DT));
+    rec.track=tracker.export();rec.track.st=rec.track.st.slice(0,Math.floor(rec.actualSec/TRACK_DT));rec.track.K=clone(tracker.K);if(detParams().on)rec.track.personal=1;
     for(const k of ['hr','bk','br'])rec.track[k]=rec.track[k].slice(0,rec.track.st.length);
     rec.marks=[];
   }
@@ -3926,7 +3939,7 @@ const Probe={on:false,list:[],pending:null,duckUntil:0,
     tracker.openTaps(start,10,tapThr(tracker),n=>chime('tap',0,n));
     // pendant la fenêtre de réponse, lecture des capteurs 5 fois par seconde pour que le « tic » suive la tape
     clearInterval(this.fast);this.fast=setInterval(trackStep,200);
-    this.pending={t:Math.round(t*10)/10,why,gap:Math.round((this.gap||1)*10)/10,st:tracker.state,imm:i.imm==null||!Number.isFinite(i.imm)?null:Math.round(i.imm),drop:h&&Number.isFinite(h.drop)?Math.round(h.drop*10)/10:null,start,end:start+10};
+    this.pending={t:Math.round(t*10)/10,why,gap:Math.round((this.gap||1)*10)/10,st:tracker.state,f:tracker.feat?clone(tracker.feat):null,imm:i.imm==null||!Number.isFinite(i.imm)?null:Math.round(i.imm),drop:h&&Number.isFinite(h.drop)?Math.round(h.drop*10)/10:null,start,end:start+10};
     graphDirty=true;
   },
   close(){
@@ -3935,7 +3948,7 @@ const Probe={on:false,list:[],pending:null,duckUntil:0,
     let n=0,lat=null,max=0,mv=0,hz=null;if(W){W.closed=true;n=W.taps.length;lat=n?Math.round((W.taps[0]-p.start)*10)/10:null;max=W.max;mv=W.mv;hz=Math.round(W.ns/(W.to-W.from+0.3));}
     const moved=n>6||mv>=5;
     const ans=moved?null:Math.min(3,n);
-    const rec={t:p.t,why:p.why,st:p.st,ans,n,lat,imm:p.imm,drop:p.drop,pk:Math.round(max*100),thr:W?Math.round(W.thr*100):null,hz,gap:p.gap};if(moved)rec.moved=1;
+    const rec={t:p.t,why:p.why,st:p.st,ans,n,lat,imm:p.imm,drop:p.drop,pk:Math.round(max*100),thr:W?Math.round(W.thr*100):null,hz,gap:p.gap};if(moved)rec.moved=1;if(p.f)rec.f=p.f;
     this.list.push(rec);
     this.lastT=p.t;this.next=p.t+rnd(360,600);
     if(ans===0){if(p.why!=='confirm')this.confirmAt=p.t+120;else{this.confirmAt=null;this.quietUntil=p.t+1200;this.next=Math.max(this.next,this.quietUntil+rnd(0,240));}}
@@ -3945,8 +3958,9 @@ const Probe={on:false,list:[],pending:null,duckUntil:0,
   finish(rec){
     if(this.pending)this.close();
     const mc=trainMusicCfg();
-    rec.training={kind:this.kind,v:1,probes:this.list.slice(),sens:settings.train.sens,vol:settings.train.vol,music:mc.id&&Music.cur===mc.id?Music.name:null};
+    rec.training={kind:this.kind,v:2,probes:this.list.slice(),sens:settings.train.sens,vol:settings.train.vol,music:mc.id&&Music.cur===mc.id?Music.name:null};
     this.on=false;
+    setTimeout(()=>{detFit();renderTrain();},0);
   }
 };
 // accord : l'appli estimait « endormi » et tu ne répondais plus, ou « éveillé » et tu répondais
@@ -3960,6 +3974,35 @@ function probeText(r){
   const a=probeAgreement(ps);if(a.n)L.push(`  accord avec l'estimation : ${a.pct} % (${a.ok} sur ${a.n})`);
   return L;
 }
+// recherche des seuils qui collent le mieux à tes réponses ; à égalité, les plus proches des seuils communs
+const DET_GRID={shift:[],drop:[3,4,5,6,7,8,9,10],cv:[0.12,0.14,0.16,0.18,0.2,0.22,0.24,0.26,0.28,0.3]};
+for(let x=-180;x<=1200;x+=60)DET_GRID.shift.push(x);
+const DET_MIN=10,DET_FULL=30;
+function detData(){return (Store.get('history',[])||[]).filter(r=>r.training).flatMap(r=>r.training.probes||[]).filter(p=>p.f&&p.ans!=null);}
+function detScore(ps,K){let ok=0;for(const p of ps)if(detPredict(p.f,K)===(p.ans===0))ok++;return ok;}
+function detFit(){
+  const ps=detData(),n=ps.length,base=detScore(ps,DET_DEFAULT);
+  const out={n,base,best:base,K:clone(DET_DEFAULT),fit:clone(DET_DEFAULT),at:Date.now()};
+  if(n>=DET_MIN){
+    let best=-1,bd=Infinity,bk=null;
+    for(const shift of DET_GRID.shift)for(const drop of DET_GRID.drop)for(const cv of DET_GRID.cv){
+      const K={shift,drop,cv},sc=detScore(ps,K),d=Math.abs(shift)/600+Math.abs(drop-5)/5+Math.abs(cv-0.22)/0.1;
+      if(sc>best||(sc===best&&d<bd)){best=sc;bd=d;bk=K;}}
+    if(bk&&best>base){
+      // mélange progressif : rien sous 10 réponses, entièrement à soi à partir de 30
+      const w=clamp((n-DET_MIN)/(DET_FULL-DET_MIN),0.25,1),mix=(a,b)=>a+(b-a)*w;
+      out.fit=bk;out.best=best;
+      out.K={shift:Math.round(mix(0,bk.shift)/30)*30,drop:Math.round(mix(5,bk.drop)*2)/2,cv:Math.round(mix(0.22,bk.cv)*100)/100};
+      out.w=w;out.cur=detScore(ps,out.K);
+    }
+  }
+  Store.set('detPersonal',out);return out;
+}
+function detParams(){
+  const d=Store.get('detPersonal',null);
+  const on=settings.train.personal!==false&&d&&d.n>=DET_MIN&&d.best>d.base;
+  return {K:on?d.K:clone(DET_DEFAULT),on:!!on,d};
+}
 function renderTrain(){
   const hist=(Store.get('history',[])||[]).filter(r=>r.training),ps=hist.flatMap(r=>r.training.probes||[]),box=$('#trainStats');box.innerHTML='';
   const P=t=>{const q=el('p');q.innerHTML=t;box.append(q);};
@@ -3972,8 +4015,18 @@ function renderTrain(){
       P(`L'appli te croyait endormi alors que tu répondais : ${a.falseSleep} fois`);
       P(`L'appli te croyait éveillé alors que tu ne répondais plus : ${a.falseWake} fois`);}
   }
-  const ans=ps.filter(p=>p.ans!=null).length;
-  P(`Détection utilisée : <b>modèle commun</b>. La détection personnalisée s'appuiera sur ces réponses, à partir d'une trentaine (${Math.min(ans,30)}/30).`);
+  const dp=detParams(),d=dp.d||detFit(),mm=x=>`${Math.round(x/60)} min`;
+  if(!d||d.n<DET_MIN)P(`Détection utilisée : <b>réglages communs</b>. L'ajustement à toi commence à ${DET_MIN} réponses (${d?d.n:0}/${DET_MIN}).`);
+  else if(!(d.best>d.base))P(`Détection utilisée : <b>réglages communs</b>. Sur tes ${d.n} réponses, aucun autre réglage ne fait mieux (accord ${Math.round(100*d.base/d.n)} %).`);
+  else{const K=d.K;
+    P(`Détection utilisée : <b>${dp.on?'personnalisée':'réglages communs (personnalisation coupée)'}</b>${dp.on&&d.w<1?`, appliquée à ${Math.round(d.w*100)} % (entièrement à ${DET_FULL} réponses)`:''}.`);
+    const F=d.fit,toward=(cur,fit,f)=>d.w<1&&cur!==fit?` (vers ${f(fit)} à ${DET_FULL} réponses)`:'';
+    P(K.shift?`Immobile avant « sommeil léger » : ${mm(480+K.shift)} au lieu de 8 min, ${mm(600+K.shift)} au lieu de 10 sans cardio${toward(K.shift,F.shift,x=>mm(480+x))}`:'Immobile avant « sommeil léger » : 8 min, 10 sans cardio (inchangé)');
+    P(K.drop!==5?`Baisse du cœur exigée : ${fmtNum(K.drop)} bpm au lieu de 5${toward(K.drop,F.drop,x=>fmtNum(x)+' bpm')}`:'Baisse du cœur exigée : 5 bpm (inchangée)');
+    P(K.cv!==0.22?`Respiration jugée calme : variabilité sous ${Math.round(K.cv*100)} % au lieu de 22 %${toward(K.cv,F.cv,x=>Math.round(x*100)+' %')}`:'Respiration jugée calme : variabilité sous 22 % (inchangée)');
+    P(`Accord sur tes ${d.n} réponses : ${Math.round(100*d.base/d.n)} % avec les réglages communs, <b>${Math.round(100*(d.cur??d.best)/d.n)} %</b> avec les tiens.`);}
+  if(d&&d.n<ps.filter(p=>p.ans!=null).length)P(`Seules les réponses enregistrées depuis la version 1.0.49 servent à l'ajustement (${d.n} sur ${ps.filter(p=>p.ans!=null).length}).`);
+  $('#trPersonalRow').hidden=!(d&&d.n>=DET_MIN&&d.best>d.base);
   $('#sumTrain').textContent=ps.length?`${ps.length} réponse${ps.length>1?'s':''}`:'Séance Sommeil';
 }
 function trainMusicCfg(){const t=settings.train;
@@ -4033,10 +4086,11 @@ const TapTest={busy:false,
 };
 $('#btnProbeTest').addEventListener('click',()=>TapTest.run());
 $('#btnTrainStart').addEventListener('click',startTraining);
+$('#trPersonalRow input').addEventListener('change',()=>setTimeout(renderTrain,0));
 renderTrain();
 
 /* ===== numéro de version : celui de l'APK (Android) ou celui de la publication web ; c'est le même que sur GitHub (v1.0.N) ===== */
-const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.48';})();
+const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.49';})();
 function nativeScrollbars(){try{const n=window.VibrostaseNative;if(n&&n.scrollbars)n.scrollbars(true);}catch(e){}}
 if(BUILD_VERSION&&!BUILD_VERSION.startsWith('__')){const t='v'+BUILD_VERSION;const a=$('#splashVer');if(a)a.textContent=t;const b=$('#appVer');if(b)b.textContent=`Vibralia ${t}${window.VibrostaseNative?' · Android':' · web'}`;}
 
