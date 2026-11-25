@@ -675,7 +675,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
       <p class="grp">Séance Sommeil</p>
       <p class="hint">Pas de sons d'EV : seulement une musique, ou le silence. De temps en temps, un bip (trois notes courtes qui montent). Réponds en <b>tapotant le téléphone du doigt</b>, dans les 10 secondes :</p>
       <ul class="hint anslist"><li><b>3 tapes</b> : pleinement conscient</li><li><b>2 tapes</b> : bien détendu</li><li><b>1 tape</b> : à la frontière, hypnagogie</li><li><b>Aucune</b> : endormi, ou plus assez conscient pour répondre</li></ul>
-      <p class="hint">Le bip sonne quand l'appli pense que tu viens de t'endormir, et aussi au hasard toutes les 6 à 10 minutes. Jamais deux bips à moins de 4 minutes ; après deux bips sans réponse, plus rien pendant 20 minutes.</p>
+      <p class="hint">Un premier bip vers la 4e ou 5e minute (référence éveillée), puis quand l'appli pense que tu viens de t'endormir, et au hasard toutes les 6 à 10 minutes. Jamais deux bips à moins de 4 minutes ; après deux bips sans réponse, plus rien pendant 20 minutes.</p>
       <div class="field"><label for="trMin">Durée</label><output for="trMin"></output>
         <input id="trMin" type="range" min="15" max="120" step="5" data-key="train.min" data-fmt="min"></div>
       <div class="field"><label for="trVol">Volume du bip</label><output for="trVol"></output>
@@ -2393,9 +2393,15 @@ function seqText(seq){return seq.map(x=>{let d=SEG_TYPES[x.type].levelText?`${Ma
 function summaryText(r){
   const d=new Date(r.startedAt),s=r.settings,L=[];
   const seq=s.sequence?sanitizeSeq(s.sequence):legacySeq(s.phases||{});
-  L.push(`Vibralia, séance du ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`);
-  L.push(`Graine : ${r.seedCode}`);
+  const TR=!!r.training;
+  L.push(`Vibralia, ${TR?'entraînement sommeil':'séance'} du ${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}`);
+  if(!TR)L.push(`Graine : ${r.seedCode}`);
   L.push(`Durée : ${fmtTime(r.actualSec)} sur ${fmtTime(r.plannedSec)} prévues${r.completed?'':' (arrêtée avant la fin)'}`);
+  if(TR){L.push(`Musique : ${r.training.music||'aucune (silence)'}`);
+    if(r.hr.source!=='none'&&r.hr.baseline!=null)L.push(`Cardio : référence ${r.hr.baseline} bpm${r.hr.min!=null?`, min ${r.hr.min}, max ${r.hr.max}`:''}`);
+    if(r.track)L.push(...trackText(r));L.push(...probeText(r));
+    if(r.note&&r.note.trim())L.push(`Ressenti : ${r.note.trim()}`);
+    return L.join('\n');}
   if(r.mode)L.push(r.mode==='préparé'?`Lecture préparée, avance ${r.lookahead} s, ${r.late} retard${r.late>1?'s':''} de calcul`:'Lecture en direct');
   L.push('Déroulé en minutes : '+seqText(seq));
   L.push(`Réglages : contraste ${({soft:'doux',medium:'moyen',strong:'fort'})[s.contrast||'soft']}, intensité max ${Math.round(s.maxIntensity*100)} %, base ${s.baseFreq} Hz, va-et-vient ${Math.round((s.sweepDepth??1)*100)} %, pulsation ${Math.round((s.pulseDepth??0.8)*100)} %, ${s.binaural?`binaural ${fmtNum(s.binauralBeat)} Hz`:'sans binaural'}, fréquence des sons ${fmtNum(s.density)}, présence ${Math.round(s.eventLevel*100)} %${s.evDensity!=null?`, densité EV ${Math.round(s.evDensity*100)} %`:''}`);
@@ -2882,7 +2888,7 @@ async function startSessionInner(){
   engine.watchInterruptions(st=>{const b=$('#runBuf');if(!session)return;if(st==='running'){b.dataset.int='';return;}
     b.hidden=false;b.dataset.int='1';b.textContent='Son interrompu par le téléphone. Touche l\'écran pour reprendre.';});
   // entraînement : silence (et musique de fond) pendant toute la durée, sans déroulé adaptatif
-  const sset=clone(settings);if(tr){sset.sequence=[S('silence',tr.min)];sset.track.adaptive=false;}
+  const sset=clone(settings);if(tr){sset.sequence=[];for(let m=tr.min;m>0;m-=60)sset.sequence.push(S('silence',Math.min(60,m)));sset.track.adaptive=false;}
   session=new Session({engine,hr,samples:effSamples(),settings:sset,
     onEvent:ev=>{if(!reduced||rings.length<20)rings.push({t0:performance.now(),pan:ev.pan,d:ev.distance,y:0.15+Math.random()*0.7});if(settings.showEvents)$('#runEv').textContent=ev.label;},
     onTick:uiTick,onEnd,onError:err=>showMsg('Erreur de calcul du son : '+(err&&err.message||err))});
@@ -3315,7 +3321,7 @@ async function exportPng(){
   const r=viewRec;if(!r)return;const msg=$('#pngMsg');msg.textContent='Préparation…';
   const W=1200,H=760,c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
   g.fillStyle=cssVar('--bg')||'#12132a';g.fillRect(0,0,W,H);
-  const d=new Date(r.startedAt),cur=(()=>{const k=seqKey(sanitizeSeq(r.settings.sequence||[]));const p=BUILTIN_PRESETS.find(x=>seqKey(x.seq)===k);return p?p.label:'déroulé personnalisé';})();
+  const d=new Date(r.startedAt),cur=(()=>{const k=seqKey(sanitizeSeq(r.settings.sequence||[]));const p=BUILTIN_PRESETS.find(x=>seqKey(x.seq)===k);return r.training?'entraînement sommeil':p?p.label:'déroulé personnalisé';})();
   g.fillStyle=cssVar('--text')||'#cdc8e0';g.font='600 30px Figtree, system-ui, sans-serif';g.textBaseline='top';g.fillText('Vibralia',40,30);
   g.fillStyle=cssVar('--muted')||'#8a86a8';g.font='20px Figtree, system-ui, sans-serif';
   g.fillText(`${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · ${cur} · ${fmtTime(r.actualSec)}`,40,72);
@@ -3891,7 +3897,7 @@ const tapThr=tk=>Math.max(TAP_BASE[settings.train.sens]||0.7,(tk?tk.thrMove:0.08
 const PROBE_WHY={onset:'endormissement estimé',random:'au hasard',confirm:'confirmation'};
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const Probe={on:false,list:[],pending:null,duckUntil:0,
-  begin(tr,calib){Object.assign(this,{on:true,kind:tr.kind||'sleep',list:[],pending:null,lastT:-1e9,quietUntil:0,confirmAt:null,prevSleep:false,onsetAt:null,next:calib+rnd(480,720),minT:calib+180});},
+  begin(tr,calib){Object.assign(this,{on:true,kind:tr.kind||'sleep',list:[],pending:null,lastT:-1e9,quietUntil:0,confirmAt:null,prevSleep:false,onsetAt:null,next:calib+rnd(240,360),minT:calib+180});},
   tick(t){
     if(!this.on||!tracker)return;
     const now=performance.now();this.gap=this.lastTick?(now-this.lastTick)/1000:1;this.lastTick=now;
@@ -3927,7 +3933,8 @@ const Probe={on:false,list:[],pending:null,duckUntil:0,
   },
   finish(rec){
     if(this.pending)this.close();
-    rec.training={kind:this.kind,v:1,probes:this.list.slice(),sens:settings.train.sens,vol:settings.train.vol};
+    const mc=trainMusicCfg();
+    rec.training={kind:this.kind,v:1,probes:this.list.slice(),sens:settings.train.sens,vol:settings.train.vol,music:mc.id&&Music.cur===mc.id?Music.name:null};
     this.on=false;
   }
 };
@@ -4018,7 +4025,7 @@ $('#btnTrainStart').addEventListener('click',startTraining);
 renderTrain();
 
 /* ===== numéro de version : celui de l'APK (Android) ou celui de la publication web ; c'est le même que sur GitHub (v1.0.N) ===== */
-const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.45';})();
+const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.46';})();
 function nativeScrollbars(){try{const n=window.VibrostaseNative;if(n&&n.scrollbars)n.scrollbars(true);}catch(e){}}
 if(BUILD_VERSION&&!BUILD_VERSION.startsWith('__')){const t='v'+BUILD_VERSION;const a=$('#splashVer');if(a)a.textContent=t;const b=$('#appVer');if(b)b.textContent=`Vibralia ${t}${window.VibrostaseNative?' · Android':' · web'}`;}
 
