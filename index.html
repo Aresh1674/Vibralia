@@ -673,7 +673,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
     <div class="pagebody">
       <p class="hint">Des séances à part, qui ne comptent pas dans tes statistiques. Elles servent à comparer ce que l'appli estime avec ce que tu vis vraiment.</p>
       <p class="grp">Séance Sommeil</p>
-      <p class="hint">Pas de sons d'EV : seulement une musique, ou le silence. De temps en temps, un bip (trois notes courtes qui montent). Réponds en <b>tapotant le téléphone du doigt</b>, dans les 10 secondes :</p>
+      <p class="hint">Pas de sons d'EV : seulement une musique, ou le silence. De temps en temps, un bip (trois notes courtes qui montent). Réponds en <b>tapotant le téléphone du doigt</b>, dans les 10 secondes ; chaque tape comptée fait un petit « tic » :</p>
       <ul class="hint anslist"><li><b>3 tapes</b> : pleinement conscient</li><li><b>2 tapes</b> : bien détendu</li><li><b>1 tape</b> : à la frontière, hypnagogie</li><li><b>Aucune</b> : endormi, ou plus assez conscient pour répondre</li></ul>
       <p class="hint">Un premier bip vers la 4e ou 5e minute (référence éveillée), puis quand l'appli pense que tu viens de t'endormir, et au hasard toutes les 6 à 10 minutes. Jamais deux bips à moins de 4 minutes ; après deux bips sans réponse, plus rien pendant 20 minutes.</p>
       <div class="field"><label for="trMin">Durée</label><output for="trMin"></output>
@@ -1870,7 +1870,7 @@ class BodyTracker{
     // réponse à un bip d'entraînement : pics nets de l'accélération (tapes du doigt sur le téléphone)
     const W=this.tapWin;
     if(W&&!W.closed&&t>=W.from-0.3&&t<=W.to){const m=Math.sqrt(hp2);W.ns++;if(m>W.max)W.max=m;
-      if(!W.up&&m>=W.thr){W.up=true;if(t-W.last>=0.2){W.taps.push(t);W.last=t;}}else if(W.up&&m<W.thr*0.5)W.up=false;}
+      if(!W.up&&m>=W.thr){W.up=true;if(t-W.last>=0.2){W.taps.push(t);W.last=t;if(W.onTap)W.onTap(W.taps.length);}}else if(W.up&&m<W.thr*0.5)W.up=false;}
     // respiration : bande lente (inclinaison du téléphone), échantillonnée à 4 Hz
     const q=Math.floor(t*4);
     if(this.brAcc&&this.brAcc.q!==q){const b=this.brAcc;this.brBuf.push([b.q/4,b.v[0]/b.n,b.v[1]/b.n,b.v[2]/b.n]);
@@ -2005,7 +2005,7 @@ class BodyTracker{
     this.samples.push({t,st:s,hr:last&&t-last[0]<15?Math.round(last[1]):0,bk:bi,br:this.br.rate?Math.round(this.br.rate*10):0});
   }
   // ouvre la fenêtre de réponse à un bip : de `from` à `from+dur` (temps de séance, s)
-  openTaps(from,dur,thr){this.tapWin={from,to:from+dur,thr,taps:[],up:false,last:-9,max:0,mv:0,ns:0,closed:false};}
+  openTaps(from,dur,thr,onTap){this.tapWin={from,to:from+dur,thr,taps:[],up:false,last:-9,max:0,mv:0,ns:0,closed:false,onTap};}
   /* résultat d'une calibration faite avant la séance (tracker de calibration → tracker de séance) */
   calibResult(){
     const hrv=this.hrS.filter((x,i)=>i%4===0).map(x=>x[1]); // la calibration relève le cœur 4 fois par seconde
@@ -3163,7 +3163,9 @@ function trackStart(cal){
     const still=tracker.state===ST.stase&&tracker.info&&tracker.info.imm!=null&&tracker.info.imm>=180;
     return {asleep,still,skip:on&&tracker.asleepFor>=settings.track.sleepSkip*60,hold:on&&tracker.evRecent,maxHold:settings.track.evHold*60};
   };
-  trackTimer=setInterval(()=>{
+  trackTimer=setInterval(trackStep,1000);
+}
+function trackStep(){
     if(!session||!tracker)return;
     const v=session.view(),d=PhoneSensors.poll();
     if(v.preparing)return;
@@ -3172,7 +3174,6 @@ function trackStart(cal){
     tracker.update(v.played,d,hrv,v.type);
     if(tracker.samples.length!==n)graphDirty=true;
     if(Probe.on)Probe.tick(v.played);
-  },1000);
 }
 function trackStop(rec){
   clearInterval(trackTimer);trackTimer=null;
@@ -3408,6 +3409,11 @@ function chime(kind,delay=0,n=0){
     const bar=(f,t)=>{for(const [m,a,d] of [[1,1,0.32],[3.93,0.22,0.09]]){const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=f*m;
       g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.5*a,t+0.006);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(out);o.start(t);o.stop(t+d+0.05);}};
     [[880,0],[1108.73,0.16],[1318.51,0.32]].forEach(([f,d])=>bar(f,t0+d));
+  }
+  else if(kind==='tap'){
+    out.gain.value=0.7*clamp(settings.train.vol,0.05,1);
+    const f=[1175,1397,1661,1865][Math.min(3,Math.max(0,n-1))],o=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,t0);g.gain.exponentialRampToValueAtTime(0.6,t0+0.004);g.gain.exponentialRampToValueAtTime(0.0001,t0+0.07);o.connect(g);g.connect(out);o.start(t0);o.stop(t0+0.1);
   }
   else if(kind==='count'){
     // retour du test : un petit son par tape comptée, ou un son grave si aucune
@@ -3915,11 +3921,14 @@ const Probe={on:false,list:[],pending:null,duckUntil:0,
     this.duckUntil=performance.now()+2200;Music.update(session&&session.view());
     chime('probe',0.3);
     const start=t+1.0,i=tracker.info||{},h=i.hr;
-    tracker.openTaps(start,10,tapThr(tracker));
+    tracker.openTaps(start,10,tapThr(tracker),n=>chime('tap',0,n));
+    // pendant la fenêtre de réponse, lecture des capteurs 5 fois par seconde pour que le « tic » suive la tape
+    clearInterval(this.fast);this.fast=setInterval(trackStep,200);
     this.pending={t:Math.round(t*10)/10,why,gap:Math.round((this.gap||1)*10)/10,st:tracker.state,imm:i.imm==null||!Number.isFinite(i.imm)?null:Math.round(i.imm),drop:h&&Number.isFinite(h.drop)?Math.round(h.drop*10)/10:null,start,end:start+10};
     graphDirty=true;
   },
   close(){
+    clearInterval(this.fast);this.fast=0;
     const p=this.pending,W=tracker&&tracker.tapWin;this.pending=null;if(!p)return;
     let n=0,lat=null,max=0,mv=0,hz=null;if(W){W.closed=true;n=W.taps.length;lat=n?Math.round((W.taps[0]-p.start)*10)/10:null;max=W.max;mv=W.mv;hz=Math.round(W.ns/(W.to-W.from+0.3));}
     const moved=n>6||mv>=5;
@@ -4001,7 +4010,7 @@ const TapTest={busy:false,
       const it=setInterval(feed,200);
       box.hidden=false;cnt.textContent='…';
       await wait(400);feed();const P0=P;
-      chime('probe',10);tk.openTaps(P0+10.4,10,tapThr(null));
+      chime('probe',10);tk.openTaps(P0+10.4,10,tapThr(null),n=>chime('tap',0,n));
       const t0=performance.now();
       while(performance.now()-t0<10400){msg.textContent=`Bip dans ${Math.max(1,Math.ceil(10.4-(performance.now()-t0)/1000))} s. Tu peux verrouiller le téléphone et le poser comme pour une séance.`;await wait(250);}
       msg.textContent='Tape maintenant, du bout du doigt, sur le téléphone.';
@@ -4025,7 +4034,7 @@ $('#btnTrainStart').addEventListener('click',startTraining);
 renderTrain();
 
 /* ===== numéro de version : celui de l'APK (Android) ou celui de la publication web ; c'est le même que sur GitHub (v1.0.N) ===== */
-const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.46';})();
+const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.47';})();
 function nativeScrollbars(){try{const n=window.VibrostaseNative;if(n&&n.scrollbars)n.scrollbars(true);}catch(e){}}
 if(BUILD_VERSION&&!BUILD_VERSION.startsWith('__')){const t='v'+BUILD_VERSION;const a=$('#splashVer');if(a)a.textContent=t;const b=$('#appVer');if(b)b.textContent=`Vibralia ${t}${window.VibrostaseNative?' · Android':' · web'}`;}
 
