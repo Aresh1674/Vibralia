@@ -673,7 +673,7 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
     <div class="pagebody">
       <p class="hint">Des séances à part, qui ne comptent pas dans tes statistiques. Elles servent à comparer ce que l'appli estime avec ce que tu vis vraiment.</p>
       <p class="grp">Séance Sommeil</p>
-      <p class="hint">Pas de sons d'EV : seulement le silence, ou ta musique de fond. De temps en temps, un bip (trois notes courtes qui montent). Réponds en <b>tapotant le téléphone du doigt</b>, dans les 10 secondes :</p>
+      <p class="hint">Pas de sons d'EV : seulement une musique, ou le silence. De temps en temps, un bip (trois notes courtes qui montent). Réponds en <b>tapotant le téléphone du doigt</b>, dans les 10 secondes :</p>
       <ul class="hint anslist"><li><b>3 tapes</b> : pleinement conscient</li><li><b>2 tapes</b> : bien détendu</li><li><b>1 tape</b> : à la frontière, hypnagogie</li><li><b>Aucune</b> : endormi, ou plus assez conscient pour répondre</li></ul>
       <p class="hint">Le bip sonne quand l'appli pense que tu viens de t'endormir, et aussi au hasard toutes les 6 à 10 minutes. Jamais deux bips à moins de 4 minutes ; après deux bips sans réponse, plus rien pendant 20 minutes.</p>
       <div class="field"><label for="trMin">Durée</label><output for="trMin"></output>
@@ -686,9 +686,21 @@ button{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-web
           <option value="mid">Moyenne</option>
           <option value="high">Forte : tapes légères</option>
         </select></div>
+      <div class="field"><label for="trMus">Musique pendant la séance</label><span></span>
+        <select id="trMus" data-key="train.musicMode" style="grid-column:1 / -1">
+          <option value="seq">Celle du déroulé</option>
+          <option value="own">Une musique à part</option>
+          <option value="none">Aucune (silence)</option>
+        </select></div>
+      <p class="hint" id="trMusicName"></p>
+      <div class="row" id="trMusicRow"><button id="btnTrMusicImport" hidden>Importer un fichier</button><button id="btnTrMusicPlay" hidden>▶ Écouter</button></div>
+      <input id="trMusicFile" type="file" accept="audio/*" hidden>
+      <div class="field" id="trMusicVolF" hidden><label for="trMV">Volume de la musique</label><output for="trMV"></output>
+        <input id="trMV" type="range" min="0.05" max="1" step="0.05" data-key="train.musicVol" data-fmt="pct"></div>
+      <p class="hint">Une musique douce ou un bruit de fond est conseillé : ça aide à lâcher prise et, écran verrouillé, Android laisse l'appli plus réactive quand elle joue du son.</p>
       <div class="row"><button id="btnProbeTest">Tester le bip et les tapes</button></div>
       <div id="probeTest" hidden><div class="tapcount" id="tapCount">0</div></div>
-      <p class="hint" id="probeTestMsg">Pose le téléphone comme pour une séance, lance le test et tape quand le bip sonne.</p>
+      <p class="hint" id="probeTestMsg">Le bip sonne 10 secondes après le lancement du test : tu peux verrouiller le téléphone et le poser comme pour une séance. Après tes tapes, tu entends autant de petits sons que de tapes comptées (un son grave s'il n'en a compté aucune).</p>
       <div class="row"><button id="btnTrainStart" class="primary">Démarrer une séance Sommeil</button></div>
       <p class="grp">Ta détection</p>
       <div class="hint" id="trainStats"></div>
@@ -1019,7 +1031,7 @@ const DEFAULTS={
   pulseDepth:0.8, density:0.5, eventLevel:0.6, evDensity:0.7, evFocusChance:0.5, eerie:0.25,
   families:Object.fromEntries(FAMILIES.map(f=>[f.id,true])),
   music:{id:null,volume:0.35,duck:true}, // musique de fond (fichier dans IndexedDB)
-  train:{min:45,vol:0.6,sens:'mid'}, // séances d'entraînement de la détection
+  train:{min:45,vol:0.6,sens:'mid',musicMode:'seq',musicId:null,musicVol:0.35}, // séances d'entraînement de la détection
   mixSynth:{}, // familles où le son d'origine reste tiré au hasard avec les enregistrements importés
   showEvents:true,
   hr:{source:'none',waitCalm:true,calmDrop:5,maxWait:10,guard:true},
@@ -1857,7 +1869,7 @@ class BodyTracker{
     for(let i=0;i<3;i++){const hp=a[i]-f.fast[i];hp2+=hp*hp;f.fast[i]+=kf*(a[i]-f.fast[i]);f.slow[i]+=ks*(a[i]-f.slow[i]);br[i]=f.fast[i]-f.slow[i];}
     // réponse à un bip d'entraînement : pics nets de l'accélération (tapes du doigt sur le téléphone)
     const W=this.tapWin;
-    if(W&&!W.closed&&t>=W.from-0.3&&t<=W.to){const m=Math.sqrt(hp2);if(m>W.max)W.max=m;
+    if(W&&!W.closed&&t>=W.from-0.3&&t<=W.to){const m=Math.sqrt(hp2);W.ns++;if(m>W.max)W.max=m;
       if(!W.up&&m>=W.thr){W.up=true;if(t-W.last>=0.2){W.taps.push(t);W.last=t;}}else if(W.up&&m<W.thr*0.5)W.up=false;}
     // respiration : bande lente (inclinaison du téléphone), échantillonnée à 4 Hz
     const q=Math.floor(t*4);
@@ -1993,7 +2005,7 @@ class BodyTracker{
     this.samples.push({t,st:s,hr:last&&t-last[0]<15?Math.round(last[1]):0,bk:bi,br:this.br.rate?Math.round(this.br.rate*10):0});
   }
   // ouvre la fenêtre de réponse à un bip : de `from` à `from+dur` (temps de séance, s)
-  openTaps(from,dur,thr){this.tapWin={from,to:from+dur,thr,taps:[],up:false,last:-9,max:0,mv:0,closed:false};}
+  openTaps(from,dur,thr){this.tapWin={from,to:from+dur,thr,taps:[],up:false,last:-9,max:0,mv:0,ns:0,closed:false};}
   /* résultat d'une calibration faite avant la séance (tracker de calibration → tracker de séance) */
   calibResult(){
     const hrv=this.hrS.filter((x,i)=>i%4===0).map(x=>x[1]); // la calibration relève le cœur 4 fois par seconde
@@ -2893,6 +2905,7 @@ async function startSessionInner(){
   if(tr)Probe.begin(tr,cal?0:CALIB);
   if(trk)trackStart(cal);
   if(Music.preview)Music.togglePreview();
+  Music.over=tr?trainMusicCfg():null;
   session.start();Music.start();
   cancelAnimationFrame(rafId);rafId=requestAnimationFrame(draw);
 }
@@ -2912,7 +2925,7 @@ function uiTick(v){
   if(b.dataset.int==='1'||b.dataset.msg==='1'){}else if(v.buffered!=null&&!$('#runCtl').hidden){b.hidden=false;b.textContent=`Lecture préparée : ${Math.round(v.buffered)} s d'avance, ${v.late} retard${v.late>1?'s':''} de calcul`;}else if(!b.dataset.msg)b.hidden=true;
 }
 function onEnd(rec){
-  Music.stop(rec.completed?3000:1200);
+  Music.stop(rec.completed?3000:1200);Music.over=null;
   // signal de fin : le service Android reste actif le temps qu'il se joue, écran éteint compris
   const wait=rec.completed?endSignal():0;
   if(Probe.on)Probe.finish(rec);
@@ -3370,10 +3383,10 @@ document.querySelectorAll('#vizSeg button').forEach(b=>b.addEventListener('click
 
 /* installation et calibration avant la séance */
 let prep=null;
-function chime(kind){
+function chime(kind,delay=0,n=0){
   const ctx=engine.ctx;if(!ctx)return;
   const out=ctx.createGain();out.gain.value=0.5*clamp(settings.volume,0.2,1);out.connect(engine.out||ctx.destination);
-  const t0=ctx.currentTime+0.05;
+  const t0=ctx.currentTime+0.05+delay;
   const note=(f,t,dur,peak)=>{for(const [m,a] of [[1,1],[2.76,0.25],[5.4,0.08]]){const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=f*m;
     g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak*a,t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,t+dur/(m>1?m*0.6:1));o.connect(g);g.connect(out);o.start(t);o.stop(t+dur+0.1);}};
   if(kind==='start'){note(523.25,t0,1.4,0.35);note(659.25,t0+0.45,1.8,0.35);} // deux notes qui montent : « on y va, ne bouge plus »
@@ -3389,6 +3402,11 @@ function chime(kind){
     const bar=(f,t)=>{for(const [m,a,d] of [[1,1,0.32],[3.93,0.22,0.09]]){const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=f*m;
       g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(0.5*a,t+0.006);g.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(g);g.connect(out);o.start(t);o.stop(t+d+0.05);}};
     [[880,0],[1108.73,0.16],[1318.51,0.32]].forEach(([f,d])=>bar(f,t0+d));
+  }
+  else if(kind==='count'){
+    // retour du test : un petit son par tape comptée, ou un son grave si aucune
+    out.gain.value=0.8*clamp(settings.train.vol,0.05,1);
+    if(!n)note(220,t0,0.9,0.4);else for(let i=0;i<Math.min(n,8);i++)note(784,t0+i*0.3,0.25,0.35);
   }
   else note(392,t0,3.2,0.45);                                                   // une note de bol : « c'est parti »
   setTimeout(()=>{try{out.disconnect();}catch(e){}},5000);
@@ -3474,7 +3492,7 @@ function preflight(){
   });
 }
 function abortStart(){
-  Music.stop(300);Probe.on=false;
+  Music.stop(300);Music.over=null;Probe.on=false;
   startBlockedUntil=performance.now()+1500;
   releaseWake();if(window.VibrostaseNative)try{window.VibrostaseNative.sessionState(false,false);}catch(e){}
   PhoneSensors.stop();cancelAnimationFrame(rafId);session=null;
@@ -3494,7 +3512,8 @@ function go(v){
   $('#tabbar').hidden=!tab;document.body.classList.toggle('with-tabs',tab);document.body.classList.toggle('running',v==='run');
   document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-current',b.dataset.tab===v?'page':'false'));
   if(v==='journal')renderHistory();
-  if(v==='page-train')renderTrain();
+  if(v==='page-train'){renderTrain();renderTrainMusic();}
+  if(v!=='page-train'&&Music.preview&&Music.over)Music.togglePreview();
   if(v==='setup')(window.requestAnimationFrame||setTimeout)(drawEmblem);
   window.scrollTo(0,0);
 }
@@ -3811,26 +3830,28 @@ const Music={el:null,url:null,cur:null,timer:0,level:0,target:0,preview:false,
     if(!m)return false;this.url=URL.createObjectURL(new Blob([m.data],{type:m.type||'audio/mpeg'}));this.cur=id;this.name=m.name;return true;
   },
   element(){if(!this.el){this.el=new Audio();this.el.loop=true;this.el.preload='auto';this.el.setAttribute('playsinline','');}return this.el;},
-  vol(){return clamp((settings.music.volume||0)*(settings.volume||0),0,1);},
+  over:null,cfg(){return this.over||settings.music;},
+  vol(){return clamp((this.cfg().volume||0)*(settings.volume||0),0,1);},
   apply(){const a=this.el;if(!a)return;this.level+=(this.target-this.level)*0.25;if(Math.abs(this.target-this.level)<0.004)this.level=this.target;a.volume=clamp(this.level,0,1);},
   loop(){clearInterval(this.timer);this.timer=setInterval(()=>this.apply(),100);},
   async start(){
-    if(!settings.music.id||!(await this.load(settings.music.id)))return;
+    const c=this.cfg();if(!c.id||!(await this.load(c.id)))return;
     const a=this.element();a.src=this.url;a.currentTime=0;this.level=0;a.volume=0;this.target=this.vol();
     try{await a.play();}catch(e){return;}this.loop();
   },
   // appelé à chaque mise à jour de la séance : baisse pendant l'EV si demandé
-  update(v){if(!this.el||this.el.paused||this.preview)return;const d=settings.music.duck&&v&&v.type==='ev'?0.25:1;this.target=this.vol()*d*(performance.now()<Probe.duckUntil?0.3:1);},
+  update(v){if(!this.el||this.el.paused||this.preview)return;const d=this.cfg().duck&&v&&v.type==='ev'?0.25:1;this.target=this.vol()*d*(performance.now()<Probe.duckUntil?0.3:1);},
   stop(fade=2500){
     const a=this.el;if(!a||a.paused){clearInterval(this.timer);return;}this.target=0;const step=0.25*100/Math.max(100,fade);
     clearInterval(this.timer);this.timer=setInterval(()=>{this.level=Math.max(0,this.level-Math.max(step,this.level*step*4));a.volume=this.level;if(this.level<=0.005){clearInterval(this.timer);a.pause();}},100);
   },
-  async togglePreview(){
-    const b=$('#btnMusicPlay'),a=this.element();
-    if(this.preview){this.preview=false;a.pause();b.textContent='▶ Écouter';return;}
-    if(session||!(await this.load(settings.music.id)))return;
+  async togglePreview(btn,cfg){
+    const a=this.element();
+    if(this.preview){this.preview=false;a.pause();(this.pbtn||$('#btnMusicPlay')).textContent='▶ Écouter';this.over=null;return;}
+    const b=btn||$('#btnMusicPlay');this.pbtn=b;this.over=cfg||null;
+    if(session||!(await this.load(this.cfg().id))){this.over=null;return;}
     a.src=this.url;a.currentTime=0;this.level=this.target=this.vol();a.volume=this.level;this.preview=true;b.textContent='■ Arrêter';
-    try{await a.play();}catch(e){this.preview=false;b.textContent='▶ Écouter';}
+    try{await a.play();}catch(e){this.preview=false;b.textContent='▶ Écouter';this.over=null;}
   }
 };
 async function renderMusic(){
@@ -3842,21 +3863,24 @@ async function renderMusic(){
 }
 // les musiques que plus rien n'utilise (réglages, modèles) sont effacées
 async function pruneMusic(){
-  try{const used=new Set([settings.music.id,...Object.values(Store.get('modelMusic',{})||{}).map(x=>x&&x.id)].filter(Boolean));
+  try{const used=new Set([settings.music.id,settings.train.musicId,...Object.values(Store.get('modelMusic',{})||{}).map(x=>x&&x.id)].filter(Boolean));
     const all=await SampleDB.mAll(),old=all.map(x=>x.id).filter(x=>!used.has(x));if(old.length)await SampleDB.mDel(old);}catch(e){}
 }
 $('#btnMusicImport').addEventListener('click',()=>$('#musicFile').click());
-$('#musicFile').addEventListener('change',async e=>{
-  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
-  if(f.size>150*1024*1024)return showMsg('Fichier trop lourd (150 Mo au plus).');
+async function importMusic(f){
+  if(f.size>150*1024*1024){showMsg('Fichier trop lourd (150 Mo au plus).');return null;}
   const id='m'+Date.now().toString(36);
-  try{await SampleDB.mPut({id,name:f.name.replace(/\.[a-z0-9]{2,4}$/i,'').slice(0,80),type:f.type||'audio/mpeg',data:await f.arrayBuffer()});}catch(err){return showMsg('Import impossible : '+err.message);}
+  try{await SampleDB.mPut({id,name:f.name.replace(/\.[a-z0-9]{2,4}$/i,'').slice(0,80),type:f.type||'audio/mpeg',data:await f.arrayBuffer()});}catch(err){showMsg('Import impossible : '+err.message);return null;}
   // vérifie que le téléphone sait lire ce format
   const ok=await new Promise(res=>{const a=new Audio();const u=URL.createObjectURL(f);a.preload='metadata';a.onloadedmetadata=()=>{URL.revokeObjectURL(u);res(true);};a.onerror=()=>{URL.revokeObjectURL(u);res(false);};a.src=u;setTimeout(()=>res(true),4000);});
-  if(!ok){await SampleDB.mDel([id]);return showMsg('Ce format audio n’est pas lisible sur cet appareil.');}
-  if(Music.preview)Music.togglePreview();settings.music.id=id;saveSettings();await pruneMusic();renderMusic();
+  if(!ok){await SampleDB.mDel([id]);showMsg('Ce format audio n’est pas lisible sur cet appareil.');return null;}
+  if(Music.preview)Music.togglePreview();return id;
+}
+$('#musicFile').addEventListener('change',async e=>{
+  const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  const id=await importMusic(f);if(!id)return;settings.music.id=id;saveSettings();await pruneMusic();renderMusic();renderTrainMusic();
 });
-$('#btnMusicPlay').addEventListener('click',()=>Music.togglePreview());
+$('#btnMusicPlay').addEventListener('click',()=>Music.togglePreview($('#btnMusicPlay')));
 $('#btnMusicDel').addEventListener('click',async()=>{if(!confirmTap($('#btnMusicDel'),'Confirmer'))return;if(Music.preview)Music.togglePreview();settings.music.id=null;saveSettings();await pruneMusic();renderMusic();});
 document.querySelector('[data-sec=music]').addEventListener('toggle',e=>{if(!e.target.open&&Music.preview)Music.togglePreview();});
 renderMusic();pruneMusic();
@@ -3870,6 +3894,7 @@ const Probe={on:false,list:[],pending:null,duckUntil:0,
   begin(tr,calib){Object.assign(this,{on:true,kind:tr.kind||'sleep',list:[],pending:null,lastT:-1e9,quietUntil:0,confirmAt:null,prevSleep:false,onsetAt:null,next:calib+rnd(480,720),minT:calib+180});},
   tick(t){
     if(!this.on||!tracker)return;
+    const now=performance.now();this.gap=this.lastTick?(now-this.lastTick)/1000:1;this.lastTick=now;
     if(this.pending){if(t>=this.pending.end+2)this.close();return;}
     const sl=SLEEPING(tracker.state);
     if(sl&&!this.prevSleep)this.onsetAt=t;if(!sl)this.onsetAt=null;this.prevSleep=sl;
@@ -3882,18 +3907,18 @@ const Probe={on:false,list:[],pending:null,duckUntil:0,
   },
   fire(t,why){
     this.duckUntil=performance.now()+2200;Music.update(session&&session.view());
-    setTimeout(()=>chime('probe'),300);
+    chime('probe',0.3);
     const start=t+1.0,i=tracker.info||{},h=i.hr;
     tracker.openTaps(start,10,tapThr(tracker));
-    this.pending={t:Math.round(t*10)/10,why,st:tracker.state,imm:i.imm==null||!Number.isFinite(i.imm)?null:Math.round(i.imm),drop:h&&Number.isFinite(h.drop)?Math.round(h.drop*10)/10:null,start,end:start+10};
+    this.pending={t:Math.round(t*10)/10,why,gap:Math.round((this.gap||1)*10)/10,st:tracker.state,imm:i.imm==null||!Number.isFinite(i.imm)?null:Math.round(i.imm),drop:h&&Number.isFinite(h.drop)?Math.round(h.drop*10)/10:null,start,end:start+10};
     graphDirty=true;
   },
   close(){
     const p=this.pending,W=tracker&&tracker.tapWin;this.pending=null;if(!p)return;
-    let n=0,lat=null,max=0,mv=0;if(W){W.closed=true;n=W.taps.length;lat=n?Math.round((W.taps[0]-p.start)*10)/10:null;max=W.max;mv=W.mv;}
+    let n=0,lat=null,max=0,mv=0,hz=null;if(W){W.closed=true;n=W.taps.length;lat=n?Math.round((W.taps[0]-p.start)*10)/10:null;max=W.max;mv=W.mv;hz=Math.round(W.ns/(W.to-W.from+0.3));}
     const moved=n>6||mv>=5;
     const ans=moved?null:Math.min(3,n);
-    const rec={t:p.t,why:p.why,st:p.st,ans,n,lat,imm:p.imm,drop:p.drop,pk:Math.round(max*100),thr:W?Math.round(W.thr*100):null};if(moved)rec.moved=1;
+    const rec={t:p.t,why:p.why,st:p.st,ans,n,lat,imm:p.imm,drop:p.drop,pk:Math.round(max*100),thr:W?Math.round(W.thr*100):null,hz,gap:p.gap};if(moved)rec.moved=1;
     this.list.push(rec);
     this.lastT=p.t;this.next=p.t+rnd(360,600);
     if(ans===0){if(p.why!=='confirm')this.confirmAt=p.t+120;else{this.confirmAt=null;this.quietUntil=p.t+1200;this.next=Math.max(this.next,this.quietUntil+rnd(0,240));}}
@@ -3933,6 +3958,23 @@ function renderTrain(){
   P(`Détection utilisée : <b>modèle commun</b>. La détection personnalisée s'appuiera sur ces réponses, à partir d'une trentaine (${Math.min(ans,30)}/30).`);
   $('#sumTrain').textContent=ps.length?`${ps.length} réponse${ps.length>1?'s':''}`:'Séance Sommeil';
 }
+function trainMusicCfg(){const t=settings.train;
+  if(t.musicMode==='own')return {id:t.musicId,volume:t.musicVol,duck:false};
+  if(t.musicMode==='seq')return {id:settings.music.id,volume:settings.music.volume,duck:false};
+  return {id:null,volume:0,duck:false};}
+async function renderTrainMusic(){
+  const t=settings.train,c=trainMusicCfg();let m=null;if(c.id)try{m=await SampleDB.mGet(c.id);}catch(e){}
+  if(t.musicMode==='own'&&t.musicId&&!m){t.musicId=null;saveSettings();}
+  $('#trMusicName').textContent=t.musicMode==='none'?'Silence complet.':m?`♪ ${m.name}${t.musicMode==='seq'?' (réglée dans Déroulé et modèles)':''}`:t.musicMode==='seq'?'Le déroulé n\'a pas de musique : importe-en une à part, ou dans Déroulé et modèles.':'Aucune musique importée.';
+  $('#btnTrMusicImport').hidden=t.musicMode!=='own';$('#btnTrMusicImport').textContent=m?'Changer':'Importer un fichier';
+  $('#btnTrMusicPlay').hidden=!m;$('#trMusicRow').hidden=t.musicMode==='none';$('#trMusicVolF').hidden=t.musicMode!=='own';
+}
+$('#trMus').addEventListener('change',()=>{if(Music.preview)Music.togglePreview();setTimeout(renderTrainMusic,0);});
+$('#btnTrMusicImport').addEventListener('click',()=>$('#trMusicFile').click());
+$('#trMusicFile').addEventListener('change',async e=>{const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+  const id=await importMusic(f);if(!id)return;settings.train.musicId=id;saveSettings();await pruneMusic();renderTrainMusic();});
+$('#btnTrMusicPlay').addEventListener('click',()=>Music.togglePreview($('#btnTrMusicPlay'),trainMusicCfg()));
+$('#trMV').addEventListener('input',()=>{if(Music.preview&&Music.over){Music.over=trainMusicCfg();Music.target=Music.level=Music.vol();if(Music.el)Music.el.volume=Music.level;}});
 function startTraining(){
   if(session||starting)return;
   if(!settings.track.enabled||settings.track.position==='none')return showMsg('Active le suivi du corps avec le téléphone près de toi (Réglages › Suivi du corps) : les tapes passent par le téléphone.');
@@ -3950,18 +3992,21 @@ const TapTest={busy:false,
       const tk=new BodyTracker({position:settings.track.position,calib:0});let c0=null,P=0;
       const feed=()=>{const d=PhoneSensors.poll();if(!d.clockNow)return;if(c0==null)c0=d.clockNow-3000;P=(d.clockNow-c0)/1000;tk.update(P,d,null,'silence');};
       const it=setInterval(feed,200);
-      box.hidden=false;cnt.textContent='…';msg.textContent='Ne bouge plus. Le bip arrive dans 3 secondes.';
-      await wait(3000);feed();
-      chime('probe');tk.openTaps(P+0.4,10,tapThr(null));
-      msg.textContent='Tape maintenant, du bout du doigt, sur le téléphone.';
+      box.hidden=false;cnt.textContent='…';
+      await wait(400);feed();const P0=P;
+      chime('probe',10);tk.openTaps(P0+10.4,10,tapThr(null));
       const t0=performance.now();
-      while(performance.now()-t0<11500){cnt.textContent=String(tk.tapWin.taps.length);await wait(200);}
-      feed();clearInterval(it);
-      const n=tk.tapWin.taps.length;cnt.textContent=String(n);
+      while(performance.now()-t0<10400){msg.textContent=`Bip dans ${Math.max(1,Math.ceil(10.4-(performance.now()-t0)/1000))} s. Tu peux verrouiller le téléphone et le poser comme pour une séance.`;await wait(250);}
+      msg.textContent='Tape maintenant, du bout du doigt, sur le téléphone.';
+      while(P<P0+22&&performance.now()-t0<32000){feed();cnt.textContent=String(tk.tapWin.taps.length);await wait(250);}
+      clearInterval(it);
+      const n=tk.tapWin.taps.length;cnt.textContent=String(n);chime('count',0.2,n);
+      const hz=Math.round(tk.tapWin.ns/10.3);
       if(!tk.src.acc)msg.textContent='Aucune mesure de mouvement reçue : l\'accéléromètre ne répond pas ici.';
       else if(!n)msg.textContent='Aucune tape détectée. Tape plus franchement, ou passe la sensibilité sur « Forte ».';
       else if(n>3)msg.textContent=`${n} tapes détectées. Plus de 3 : espace un peu tes tapes, ou baisse la sensibilité.`;
       else msg.textContent=`${n} tape${n>1?'s':''} détectée${n>1?'s':''}. Si c'est bien ce que tu as fait, c'est réglé.`;
+      if(tk.src.acc)msg.textContent+=` (accéléromètre : ${hz} mesures par seconde${hz&&hz<20?', un peu lent pour compter les tapes':''})`;
     }finally{
       try{if(nat&&nat.tapTest)nat.tapTest(false);else PhoneSensors.stop();}catch(e){}
       b.disabled=false;$('#btnTrainStart').disabled=false;this.busy=false;
@@ -3973,7 +4018,7 @@ $('#btnTrainStart').addEventListener('click',startTraining);
 renderTrain();
 
 /* ===== numéro de version : celui de l'APK (Android) ou celui de la publication web ; c'est le même que sur GitHub (v1.0.N) ===== */
-const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.44';})();
+const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.45';})();
 function nativeScrollbars(){try{const n=window.VibrostaseNative;if(n&&n.scrollbars)n.scrollbars(true);}catch(e){}}
 if(BUILD_VERSION&&!BUILD_VERSION.startsWith('__')){const t='v'+BUILD_VERSION;const a=$('#splashVer');if(a)a.textContent=t;const b=$('#appVer');if(b)b.textContent=`Vibralia ${t}${window.VibrostaseNative?' · Android':' · web'}`;}
 
