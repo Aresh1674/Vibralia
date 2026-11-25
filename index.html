@@ -1912,12 +1912,14 @@ class BodyTracker{
     {const k=Math.floor(t);if(k<14400){const r=this.raw.nz;r[k]=r[k]==null?Math.round(db):Math.max(r[k],Math.round(db));}}
     if(t<=this.calib){this.calibNoise.push(db);this.noiseBase=median(this.calibNoise);return;}
     if(this.noiseBase==null)this.noiseBase=db;
-    const over=db-this.noiseBase;
-    if(over>=15){
+    const over=db-this.noiseBase,TW=this.tapWin;
+    // le bip, les « tic » et les tapes sur le téléphone ne sont pas des bruits extérieurs
+    const ownSound=TW&&t>=TW.from-2&&t<=TW.to+2;
+    if(over>=15&&!ownSound){
       const last=this.noise[this.noise.length-1];
       if(last&&t-this.lastNoiseT<5)last[1]=Math.max(last[1],Math.round(over));else this.noise.push([Math.round(t),Math.round(over)]);
       this.lastNoiseT=t;
-    }else this.noiseBase+=(db-this.noiseBase)*0.01; // la référence suit lentement le fond sonore
+    }else if(!ownSound)this.noiseBase+=(db-this.noiseBase)*0.01; // la référence suit lentement le fond sonore
   }
   /* --- analyses --- */
   _breath(t){
@@ -3203,7 +3205,7 @@ function drawLiveGraph(v){
   const c=$('#runGraph');if(c.hidden||!tracker)return;
   const {g,w,h}=sizeCanvas(c);
   const steps=session.record.steps.filter(x=>x.t<=v.played+0.5);
-  drawTrack(g,w,h,{samples:tracker.samples,tmax:Math.max(v.total||0,v.played),steps,plannedSeq:session.settings.sequence,jerks:tracker.jerks,noise:tracker.noise,
+  drawTrack(g,w,h,{samples:tracker.samples,tmax:Math.max(v.total||0,v.played),steps,plannedSeq:session.settings.sequence,jerks:tracker.jerks,noise:tracker.noise,probes:Probe.on?Probe.list:null,
     now:v.played,nowBlk:Math.max(0,BLOCKS.indexOf(v.type)),live:true,calib:tracker.calib});
 }
 function legendFor(box,rec){
@@ -3326,7 +3328,7 @@ async function exportPng(){
   g.fillStyle=cssVar('--text')||'#cdc8e0';g.font='600 30px Figtree, system-ui, sans-serif';g.textBaseline='top';g.fillText('Vibralia',40,30);
   g.fillStyle=cssVar('--muted')||'#8a86a8';g.font='20px Figtree, system-ui, sans-serif';
   g.fillText(`${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})} · ${cur} · ${fmtTime(r.actualSec)}`,40,72);
-  g.save();g.translate(20,120);g.scale(2,2);drawTrack(g,(W-40)/2,(H-210)/2,{samples:trackSamples(r.track),tmax:Math.max(r.actualSec||0,60),steps:r.steps,jerks:r.track.jerks,noise:r.track.noise,marks:r.marks||[],clock:clockMode?r.startedAt:null});g.restore();
+  g.save();g.translate(20,120);g.scale(2,2);drawTrack(g,(W-40)/2,(H-210)/2,{samples:trackSamples(r.track),tmax:Math.max(r.actualSec||0,60),steps:r.steps,jerks:r.track.jerks,noise:r.track.noise,marks:r.marks||[],clock:clockMode?r.startedAt:null,probes:r.training&&r.training.probes});g.restore();
   let x=40;g.font='18px Figtree, system-ui, sans-serif';g.textBaseline='middle';const y=H-40,used=new Set((r.steps||[]).map(s=>s.type));
   for(const b of BLOCKS)if(used.has(b)){g.fillStyle=blockColor(b);g.fillRect(x,y-3,22,6);g.fillStyle=cssVar('--muted')||'#8a86a8';g.fillText(SEG_TYPES[b].label,x+30,y);x+=40+g.measureText(SEG_TYPES[b].label).width;}
   const hv=trackSamples(r.track).map(s=>s.hr).filter(Boolean);
@@ -4034,7 +4036,7 @@ $('#btnTrainStart').addEventListener('click',startTraining);
 renderTrain();
 
 /* ===== numéro de version : celui de l'APK (Android) ou celui de la publication web ; c'est le même que sur GitHub (v1.0.N) ===== */
-const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.47';})();
+const BUILD_VERSION=(()=>{try{const n=window.VibrostaseNative;if(n&&n.appVersion)return n.appVersion();}catch(e){}return '1.0.48';})();
 function nativeScrollbars(){try{const n=window.VibrostaseNative;if(n&&n.scrollbars)n.scrollbars(true);}catch(e){}}
 if(BUILD_VERSION&&!BUILD_VERSION.startsWith('__')){const t='v'+BUILD_VERSION;const a=$('#splashVer');if(a)a.textContent=t;const b=$('#appVer');if(b)b.textContent=`Vibralia ${t}${window.VibrostaseNative?' · Android':' · web'}`;}
 
